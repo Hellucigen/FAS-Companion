@@ -1,0 +1,33 @@
+# Fascinator 认知图谱系统 - Python 依赖
+# ============================================================================
+# 核心依赖
+flask>=2.3.0          # Web 框架（API 服务）
+flask-cors>=4.0.0     # 跨域支持
+jieba>=0.42.1         # 中文分词（节点提取 / 种子脚本）
+numpy>=1.24.0         # 数值计算（向量操作）
+
+# NLP / LLM
+langchain>=0.3.0       # LLM 编排框架
+langchain-ollama>=0.2.0  # Ollama 本地 LLM 集成（可选，默认不启用：config.enable_ollama）
+# 注：对话/抽取默认走小米 MiMo API（llm_provider.py），密钥在 data/llm_secret.json（已 gitignore）
+
+# Embedding / 向量检索（语义节点匹配）
+sentence-transformers>=2.7.0   # BGE 中文嵌入模型
+faiss-cpu>=1.8.0               # Facebook AI 向量相似度搜索引擎
+
+# 视觉 / 听觉（对象发现 + 对象嵌入）
+opencv-python>=4.9.0           # 轮廓检测（object_detector 的 OpenCV 后端）
+transformers>=4.40.0           # SigLIP / CLIP 对象嵌入
+
+# 深度学习运行时
+# 装 CUDA 版才能用上 GPU（嵌入编码、SigLIP 对象嵌入、ear 特征提取；
+# 嵌入编码实测：全量索引重建 1.2s vs CPU 8s）。驱动需支持 CUDA 13.x。
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+# 只装默认版（CPU）也能跑，EmbeddingManager 会自动退回 device=cpu。
+torch>=2.12.0                  # CPU 版；GPU 请按上面命令装 +cu130
+
+# 可选依赖
+# tqdm>=4.66.0        # 进度条（init_jieba_pos.py 使用）
+# ultralytics>=8.2.0  # 摄像头姿态/行为感知（eye/pose.py，看摄像头 CAMERA_OBSERVE）
+#                     # 未装时"看摄像头"能力如实缺席，其余功能不受影响
+

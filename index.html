@@ -1,0 +1,2492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FASCINATOR — 认知图谱系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Semi+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23f4f4f4'/><text x='16' y='22' text-anchor='middle' fill='%23ff6b00' font-size='16' font-family='monospace' font-weight='bold'>F</text></svg>">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   FASCINATOR — 系统控制台 / 工业分析仪表盘
+   设计：几何结构 · 数据模块 · 浅色基底 · 橙+青绿点缀
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --bg: #f4f4f4;
+  --bg2: #e8e8e8;
+  --panel: #fafafa;
+  --panel2: #f0f0f0;
+  --border: #d0d0d0;
+  --border2: #b0b0b0;
+  --text: #1a1a1a;
+  --text2: #3a3a3a;
+  --text-dim: #888888;
+  --orange: #ff6b00;
+  --orange-dim: #ff8c3a;
+  --teal: #00d2d3;
+  --teal-dim: #009a9b;
+  --red: #e03030;
+  --green: #10a860;
+  --mono: 'Share Tech Mono', 'JetBrains Mono', 'Consolas', monospace;
+  --sans: 'Barlow Semi Condensed', 'Noto Sans SC', sans-serif;
+  --radius: 2px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-image:
+    linear-gradient(#e0e0e0 1px, transparent 1px),
+    linear-gradient(90deg, #e0e0e0 1px, transparent 1px);
+  background-size: 32px 32px;
+  background-position: -1px -1px;
+}
+
+/* ═══ 顶部系统栏 ═══ */
+#topbar {
+  background: #fafafa;
+  border-bottom: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  height: 40px;
+  gap: 0;
+  flex-shrink: 0;
+  z-index: 100;
+}
+#topbar .sys-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0 12px;
+  border-right: 1px solid #d0d0d0;
+}
+#logo {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  padding: 0 16px;
+  border-right: 1px solid #d0d0d0;
+}
+#logo .accent { color: var(--orange); }
+#topbar .sep { width: 1px; height: 20px; background: #d0d0d0; flex-shrink: 0; margin: 0 10px; }
+#status-blip {
+  width: 8px; height: 8px;
+  background: #ccc; flex-shrink: 0;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+#status-blip.online { background: var(--green); box-shadow: 0 0 6px rgba(16,168,96,0.4); }
+#status-blip.active { background: var(--orange); box-shadow: 0 0 8px rgba(255,107,0,0.5); animation: blip-pulse 1.2s infinite; }
+@keyframes blip-pulse { 0%,100%{box-shadow:0 0 4px rgba(255,107,0,0.4)} 50%{box-shadow:0 0 14px rgba(255,107,0,0.7)} }
+#status-text { font-family: var(--mono); font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-left: 6px; }
+#tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.tb-btn {
+  font-family: var(--mono); font-size: 9px; padding: 5px 14px;
+  border: 1px solid #999; background: #fafafa;
+  color: var(--text); cursor: pointer;
+  text-transform: uppercase; letter-spacing: 1px;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.tb-btn:hover { border-color: var(--text); background: #eee; }
+.tb-btn.accent { border-color: var(--orange); color: var(--orange); }
+.tb-btn.accent:hover { background: #fff5ee; }
+.tb-btn.active { border-color: var(--teal); color: var(--teal); background: #f0fefe; }
+.tb-btn.warn:hover { border-color: var(--red); color: var(--red); }
+#graph-stats { font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+
+/* ═══ 主网格布局 ═══ */
+#main {
+  display: grid;
+  grid-template-columns: 264px 1fr 296px;
+  grid-template-areas: "left graph right";
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ═══ 模块卡片通用 ═══ */
+.module {
+  background: #fafafa;
+  border: 1px solid #d5d5d5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.module-header {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text);
+  padding: 8px 12px;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.module-header .dot {
+  width: 6px; height: 6px; flex-shrink: 0;
+}
+.module-header .dot.orange { background: var(--orange); }
+.module-header .dot.teal { background: var(--teal); }
+.module-body {
+  padding: 10px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+.module-body::-webkit-scrollbar { width: 3px; }
+.module-body::-webkit-scrollbar-thumb { background: #ccc; }
+
+/* ═══ 左侧栏 ═══ */
+#left-sidebar {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-right: 1px solid #d0d0d0;
+  overflow: hidden;
+}
+#left-sidebar .module { flex: 1; min-height: 0; }
+
+/* Form rows */
+.form-row {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+}
+.form-row label {
+  font-family: var(--mono); font-size: 8px; text-transform: uppercase;
+  color: var(--text-dim); letter-spacing: 0.5px;
+  min-width: 32px; flex-shrink: 0;
+}
+.form-row input, .form-row select {
+  flex: 1; min-width: 0;
+  background: #fff; border: 1px solid #ccc;
+  color: var(--text); padding: 4px 6px;
+  font-family: var(--mono); font-size: 10px;
+  outline: none; transition: border 0.15s;
+}
+.form-row input:focus, .form-row select:focus { border-color: var(--teal); }
+.form-row input[type="range"] { padding: 0; height: 14px; accent-color: var(--orange); }
+.val-display { font-family: var(--mono); font-size: 10px; color: var(--orange); min-width: 34px; text-align: right; }
+
+/* Pills */
+.pill {
+  display: inline-block;
+  font-family: var(--mono); font-size: 8px;
+  padding: 2px 8px; border-radius: 10px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.pill-orange { background: #fff0e5; color: var(--orange); border: 1px solid rgba(255,107,0,0.25); }
+.pill-teal { background: #e5fafa; color: var(--teal-dim); border: 1px solid rgba(0,210,211,0.25); }
+.pill-gray { background: #eee; color: #666; border: 1px solid #ddd; }
+
+/* Buttons */
+.btn {
+  font-family: var(--mono); font-size: 9px; padding: 5px 12px;
+  border: 1px solid #aaa; background: #fafafa;
+  color: var(--text); cursor: pointer; text-transform: uppercase;
+  letter-spacing: 0.5px; transition: all 0.15s;
+}
+.btn:hover { border-color: var(--text); background: #eee; }
+.btn.primary { border-color: var(--orange); color: var(--orange); }
+.btn.primary:hover { background: #fff5ee; }
+.btn.teal { border-color: var(--teal); color: var(--teal-dim); }
+.btn.teal:hover { background: #f0fefe; }
+.btn.danger:hover { border-color: var(--red); color: var(--red); }
+.btn-sm {
+  font-family: var(--mono); font-size: 8px; padding: 3px 8px;
+  border: 1px solid #ccc; background: #fafafa;
+  color: #555; cursor: pointer; text-transform: uppercase;
+  letter-spacing: 0.5px; transition: all 0.15s;
+}
+.btn-sm:hover { border-color: #888; color: var(--text); }
+.btn-row { display: flex; gap: 4px; margin-top: 8px; }
+
+/* Node Explorer */
+#explore-box {
+  width: 100%; background: #fff; border: 1px solid #ccc;
+  color: var(--text); padding: 5px 8px;
+  font-family: var(--mono); font-size: 10px; outline: none;
+  margin-bottom: 4px;
+}
+#explore-box:focus { border-color: var(--teal); }
+
+/* ═══ 中央图谱区 ═══ */
+#graph-area {
+  grid-area: graph;
+  position: relative;
+  overflow: hidden;
+  background: #f9f9f9;
+  border-left: 1px solid #e8e8e8;
+  border-right: 1px solid #e8e8e8;
+}
+#graph-area::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background-image:
+    radial-gradient(circle, #ddd 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.35; pointer-events: none; z-index: 0;
+}
+#network-container {
+  position: relative; width: 100%; height: 100%; z-index: 1;
+  display: flex;
+}
+/* 双子视图：左=激活图谱（按阈值轮询），右=邻域查询（查询后冻结） */
+.graph-pane {
+  flex: 1 1 50%; min-width: 0; display: flex; flex-direction: column;
+  position: relative; border-left: 1px dashed #ddd;
+}
+.graph-pane:first-child { border-left: none; }
+.pane-bar {
+  display: flex; align-items: center; gap: 8px; padding: 3px 8px;
+  font-family: var(--mono); font-size: 8px; color: #888;
+  background: rgba(250,250,250,0.85); border-bottom: 1px solid #e4e4e4;
+  z-index: 3; letter-spacing: 1px; flex-shrink: 0;
+}
+.pane-title { color: var(--teal); white-space: nowrap; }
+.graph-pane:last-child .pane-title { color: var(--orange); }
+.pane-center { color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-ctl { margin-left: auto; display: flex; align-items: center; gap: 4px; color: #999; white-space: nowrap; }
+.pane-ctl select {
+  background: #fff; border: 1px solid #ccc; font-family: var(--mono);
+  font-size: 9px; color: var(--text); outline: none;
+}
+.pane-body { position: relative; flex: 1; min-height: 0; }
+#graph-canvas, #query-canvas {
+  display: block; width: 100%; height: 100%; cursor: grab;
+}
+#graph-empty-hint, #query-empty-hint {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  font-family: var(--mono); font-size: 10px; color: #aaa;
+  letter-spacing: 2px; text-transform: uppercase;
+  pointer-events: none; z-index: 2;
+}
+
+/* Decorative tech labels */
+.tech-label {
+  position: absolute;
+  font-family: var(--mono); font-size: 8px;
+  color: #c0c0c0; letter-spacing: 1px;
+  pointer-events: none; z-index: 0;
+}
+#tech-tl { top: 6px; left: 10px; }
+#tech-tr { top: 6px; right: 10px; }
+#tech-bl { bottom: 6px; left: 10px; }
+#tech-br { bottom: 6px; right: 10px; }
+
+/* Floating: Legend (右上) */
+#legend {
+  position: absolute; top: 38px; right: 12px;
+  background: rgba(250,250,250,0.94); border: 1px solid #d0d0d0;
+  padding: 8px 12px; font-family: var(--mono);
+  font-size: 8px; z-index: 20;
+  min-width: 140px;
+}
+#legend .leg-title {
+  font-family: var(--sans); font-size: 9px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 5px;
+}
+.leg-row { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.leg-dot { width: 8px; height: 8px; flex-shrink: 0; }
+
+/* Floating: TopK (左上) */
+#topk-badge {
+  position: absolute; top: 38px; left: 12px;
+  background: rgba(250,250,250,0.94); border: 1px solid #d0d0d0;
+  padding: 6px 10px; font-family: var(--mono);
+  font-size: 8px; z-index: 20;
+  max-width: 180px; max-height: 240px; overflow-y: auto;
+}
+#topk-badge .badge-title {
+  font-family: var(--sans); font-size: 9px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 4px;
+}
+.topk-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 2px 0; border-bottom: 1px solid #eee; cursor: pointer;
+}
+.topk-item:hover { background: rgba(255,107,0,0.04); }
+.topk-item:last-child { border-bottom: none; }
+.topk-name { color: var(--text); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topk-act { color: var(--orange); font-size: 8px; }
+.topk-label-badge { font-size: 7px; padding: 1px 4px; border-radius: 8px; margin-left: 2px; }
+.lbl-semantic { background: #e0f7fa; color: #00838f; }
+.lbl-episodic { background: #e8f5e9; color: #2e7d32; }
+.lbl-procedural { background: #ede7f6; color: #4527a0; }
+
+/* Floating: Selected info (右下) */
+#selected-info {
+  position: absolute; bottom: 12px; right: 12px;
+  background: rgba(250,250,250,0.96); border: 1px solid #ccc;
+  padding: 8px 12px; font-family: var(--mono); font-size: 8px;
+  z-index: 20; min-width: 170px; display: none;
+}
+#selected-info .si-header {
+  font-family: var(--sans); font-size: 9px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--teal-dim); margin-bottom: 5px;
+}
+#selected-info .si-row { display: flex; justify-content: space-between; padding: 1px 0; }
+#selected-info .si-key { color: var(--text-dim); }
+#selected-info .si-val { color: var(--text); }
+
+/* ═══ 右侧面板 ═══ */
+#right-panel {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid #d0d0d0;
+}
+#right-panel .module { flex: 1; min-height: 0; }
+
+/* Right tabs */
+.tabs-header {
+  display: flex; flex-wrap: wrap;     /* 标签变多后必须换行：横向溢出会把 Reg/Auto 挤出可视区 */
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0; background: #f5f5f5;
+}
+.tab-btn {
+  font-family: var(--mono); font-size: 8px; padding: 7px 10px;
+  background: transparent; border: none;
+  border-bottom: 2px solid transparent;
+  color: #999; cursor: pointer; letter-spacing: 1px;
+  text-transform: uppercase; transition: all 0.15s; white-space: nowrap;
+}
+.tab-btn:hover { color: #555; }
+.tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+.tab-content {
+  flex: 1; overflow-y: auto; padding: 10px 12px; display: none;
+}
+.tab-content.active { display: block; }
+.tab-content::-webkit-scrollbar { width: 3px; }
+.tab-content::-webkit-scrollbar-thumb { background: #ccc; }
+
+/* Chat Log */
+.chat-entry {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.chat-entry:last-child { border-bottom: none; }
+.chat-time {
+  font-family: var(--mono); font-size: 8px; color: var(--text-dim);
+  margin-bottom: 3px; letter-spacing: 0.5px;
+}
+.chat-user {
+  color: var(--orange); font-weight: 600;
+}
+.chat-user::before { content: '▸ '; font-size: 8px; }
+.chat-resp {
+  color: var(--text); margin-top: 2px;
+}
+.chat-resp::before { content: '◂ '; font-size: 8px; color: var(--teal-dim); }
+.chat-curiosity {
+  margin-top: 3px; padding: 4px 8px;
+  background: #fff8f2; border-left: 2px solid var(--orange);
+  font-family: var(--mono); font-size: 9px; color: var(--orange-dim);
+}
+.chat-curiosity .tag {
+  display: inline-block; font-size: 7px; padding: 1px 5px;
+  border: 1px solid var(--orange-dim); margin-right: 4px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.chat-resolved {
+  margin-top: 3px; padding: 4px 8px;
+  background: #f0fefe; border-left: 2px solid var(--teal);
+  font-family: var(--mono); font-size: 9px; color: var(--teal-dim);
+}
+
+/* NLP */
+#nlp-input {
+  width: 100%; min-height: 64px; background: #fff;
+  border: 1px solid #ccc; color: var(--text);
+  padding: 8px; font-family: var(--mono); font-size: 11px;
+  outline: none; resize: vertical; line-height: 1.6;
+}
+#nlp-input:focus { border-color: var(--teal); }
+#nlp-submit {
+  width: 100%; margin-top: 6px; padding: 7px;
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  background: var(--orange); border: 1px solid var(--orange);
+  color: #fff; cursor: pointer; transition: all 0.15s;
+}
+#nlp-submit:hover { background: #e55d00; }
+#nlp-submit:disabled { background: #ccc; border-color: #ccc; color: #999; cursor: not-allowed; }
+
+#nlp-result {
+  background: #fff; border: 1px solid #e0e0e0;
+  padding: 8px; font-family: var(--mono); font-size: 9px;
+  min-height: 40px; color: var(--text2); line-height: 1.5;
+  margin-top: 8px;
+}
+.nlp-section-title {
+  font-family: var(--sans); font-size: 9px; font-weight: 600;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--teal-dim); margin-bottom: 3px; margin-top: 6px;
+}
+.speech-act-tag {
+  display: inline-block; padding: 2px 10px; border-radius: 10px;
+  background: #fff0e5; color: var(--orange);
+  font-size: 9px; letter-spacing: 0.5px;
+  border: 1px solid rgba(255,107,0,0.2);
+}
+.node-tag {
+  display: inline-block; padding: 1px 6px; border-radius: 8px;
+  background: #e0f7fa; color: #00838f; margin: 1px; font-size: 9px;
+}
+.edge-tag { display: block; font-size: 9px; color: #888; margin: 1px 0; }
+.edge-tag span { color: var(--orange); }
+
+/* LLM Answer */
+#llm-answer {
+  margin-top: 8px; background: #f9fdfd; border: 1px solid #e0e0e0;
+  padding: 10px; font-size: 12px; line-height: 1.7; display: none;
+  border-left: 3px solid var(--teal);
+}
+#llm-answer .answer-label {
+  font-family: var(--sans); font-size: 9px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--teal-dim); margin-bottom: 5px;
+}
+
+/* Config */
+.cfg-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 0; border-bottom: 1px solid #eee;
+}
+.cfg-key { font-family: var(--mono); font-size: 8px; color: #888; text-transform: uppercase; flex: 1; }
+.cfg-val {
+  font-family: var(--mono); font-size: 10px; width: 80px;
+  background: #fff; border: 1px solid #ddd;
+  color: var(--orange); padding: 2px 6px; text-align: right; outline: none;
+}
+.cfg-val:focus { border-color: var(--teal); }
+
+/* TopK list */
+.topk-list-item {
+  display: flex; flex-direction: column; padding: 5px 0;
+  border-bottom: 1px solid #f0f0f0; cursor: pointer;
+}
+.topk-list-item:hover { background: rgba(255,107,0,0.03); }
+.tli-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+.tli-id { font-family: var(--mono); font-size: 10px; color: var(--text); }
+.tli-act { font-family: var(--mono); font-size: 9px; }
+.act-bar { height: 3px; transition: width 0.5s; }
+
+/* Action queue */
+.action-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 6px; border: 1px solid #eee;
+  margin-bottom: 3px; background: #fafafa;
+}
+.action-item .ai-name { font-family: var(--mono); font-size: 9px; color: var(--text); }
+.action-item .ai-act { font-family: var(--mono); font-size: 8px; color: var(--orange); }
+.exec-btn {
+  font-family: var(--mono); font-size: 7px; padding: 2px 8px;
+  border: 1px solid #ccc; background: #fafafa;
+  color: #555; cursor: pointer; text-transform: uppercase;
+}
+.exec-btn:hover { border-color: var(--teal); color: var(--teal-dim); }
+
+/* ═══ 底部控制台 ═══ */
+#console-bar {
+  height: 32px; background: #2a2a2a; border-top: 1px solid #555;
+  display: flex; align-items: center; padding: 0 16px;
+  font-family: var(--mono); font-size: 9px; color: #aaa;
+  flex-shrink: 0; cursor: pointer; gap: 10px;
+  transition: height 0.3s; overflow: hidden; position: relative;
+  z-index: 50;
+}
+#console-bar.expanded { height: 170px; cursor: default; align-items: flex-start; padding-top: 8px; }
+#console-prompt { color: var(--orange); flex-shrink: 0; }
+#console-static { color: #888; flex-shrink: 0; }
+#console-log {
+  display: none; flex: 1; overflow-y: auto; padding: 0 8px;
+  font-size: 8px; line-height: 1.6; color: #ccc;
+}
+#console-bar.expanded #console-log { display: block; }
+#console-bar.expanded #console-static { display: none; }
+#console-log::-webkit-scrollbar { width: 3px; }
+#console-log::-webkit-scrollbar-thumb { background: #555; }
+.console-entry { border-bottom: 1px solid #333; padding: 1px 0; display: flex; gap: 8px; }
+.console-time { color: #666; flex-shrink: 0; }
+.console-in { color: var(--teal); }
+.console-out { color: #ddd; flex: 1; }
+.console-decor {
+  color: #555; font-family: var(--mono); font-size: 8px;
+  letter-spacing: 2px; position: absolute;
+  right: 16px; top: 50%; transform: translateY(-50%);
+}
+#console-bar.expanded .console-decor { display: none; }
+
+/* ═══ Toast ═══ */
+#toast {
+  position: fixed; bottom: 44px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #2a2a2a; border: 1px solid #555;
+  padding: 8px 20px; font-family: var(--mono);
+  font-size: 10px; color: #eee;
+  opacity: 0; transition: opacity 0.3s, transform 0.3s;
+  z-index: 9999; pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.success { border-left: 3px solid var(--green); }
+#toast.error { border-left: 3px solid var(--red); }
+
+/* ═══ LLM Modal ═══ */
+#llm-modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 200;
+  justify-content: center; align-items: center;
+}
+#llm-modal-overlay.show { display: flex; }
+#llm-modal {
+  background: #fafafa; border: 1px solid #ccc;
+  padding: 20px 24px; min-width: 360px; max-width: 440px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+}
+#llm-modal h3 {
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--orange); margin-bottom: 14px;
+}
+#llm-modal label {
+  display: block; font-family: var(--mono); font-size: 8px;
+  color: #888; text-transform: uppercase; margin-bottom: 3px; margin-top: 8px;
+}
+#llm-modal select, #llm-modal input[type=text], #llm-modal input[type=password] {
+  width: 100%; background: #fff; border: 1px solid #ccc;
+  color: var(--text); padding: 6px 10px;
+  font-family: var(--mono); font-size: 11px; outline: none;
+}
+#llm-modal select:focus, #llm-modal input:focus { border-color: var(--teal); }
+#llm-modal .btn-row { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+#llm-modal .btn-row button {
+  font-family: var(--mono); font-size: 10px; padding: 7px 18px;
+  border: 1px solid #aaa; background: #fafafa;
+  color: var(--text); cursor: pointer; text-transform: uppercase;
+  letter-spacing: 1px; transition: all 0.15s;
+}
+#llm-modal .btn-row button.save { background: var(--orange); border-color: var(--orange); color: #fff; }
+#llm-modal .btn-row button.save:hover { background: #e55d00; }
+#llm-modal .btn-row button.cancel:hover { border-color: var(--red); color: var(--red); }
+#llm-status {
+  margin-top: 10px; font-family: var(--mono); font-size: 8px;
+  color: #888; display: flex; align-items: center; gap: 6px;
+}
+#llm-status .dot { width: 6px; height: 6px; }
+#llm-status .dot.ollama { background: var(--green); }
+#llm-status .dot.deepseek { background: var(--teal); }
+#llm-status .dot.mimo { background: var(--orange, #f90); }
+
+/* ═══ 响应式 ═══ */
+@media (max-width: 1100px) {
+  #main { grid-template-columns: 1fr; grid-template-areas: "graph" "left" "right"; overflow: auto; }
+  #graph-area { min-height: 50vh; }
+  #left-sidebar, #right-panel { max-height: 40vh; }
+}
+
+/* Review network */
+#review-network-container {
+  width: 100%; height: 260px; background: #fff;
+  border: 1px solid #ddd; margin-bottom: 6px; position: relative;
+}
+#review-network { width: 100%; height: 100%; }
+
+/* Pack list */
+.pack-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid #eee;
+}
+.pack-name { font-family: var(--mono); font-size: 9px; }
+.pack-name.on { color: var(--teal-dim); }
+.pack-name.off { color: #bbb; }
+
+/* Toggle switch */
+.toggle-switch { position: relative; display: inline-block; width: 36px; height: 18px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; transition: 0.3s; border-radius: 18px; }
+.toggle-slider:before { content: ""; position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background: white; transition: 0.3s; border-radius: 50%; }
+.toggle-switch input:checked + .toggle-slider { background: var(--teal); }
+.toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+/* Vision object list */
+.vis-obj-item { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; border: 1px solid #eee; margin-bottom: 2px; background: #fafafa; font-size: 9px; }
+.vis-obj-item .vo-id { font-family: var(--mono); color: var(--text); }
+.vis-obj-item .vo-name { color: var(--teal-dim); }
+.vis-obj-item .vo-status { font-size: 7px; padding: 1px 6px; border-radius: 8px; }
+.vo-status.new { background: #e3f2fd; color: #1565C0; }
+.vo-status.matched { background: #e8f5e9; color: #2E7D32; }
+
+</style>
+</head>
+<body>
+
+<!-- ═════════════════════ 顶部系统栏 ═════════════════════ -->
+<div id="topbar">
+  <span class="sys-label">SYSTEM OS v2.0</span>
+  <span id="logo">FASC<span class="accent">I</span>NATOR</span>
+  <span class="sep"></span>
+  <span id="status-blip"></span>
+  <span id="status-text">STANDBY</span>
+  <span class="sep"></span>
+  <button class="tb-btn accent" onclick="toggleAuto()" id="btn-auto">▶ DIFFUSE</button>
+  <button class="tb-btn" onclick="diffuseStep()">STEP</button>
+  <button class="tb-btn" onclick="diffuseRound()">ROUND</button>
+  <button class="tb-btn" onclick="fetchAndRender()">⟳</button>
+  <button class="tb-btn" onclick="openLLMSettings()">⚙ LLM</button>
+  <span id="tb-right">
+    <span id="graph-stats">N:0 / E:0</span>
+    <button class="tb-btn warn" onclick="resetAll()">RESET</button>
+  </span>
+</div>
+
+<!-- ═════════════════════ 主三栏网格 ═════════════════════ -->
+<div id="main">
+
+<!-- 左侧栏 -->
+<div id="left-sidebar">
+
+  <!-- 节点探索模块 -->
+  <div class="module" style="flex:0 0 auto;">
+    <div class="module-header"><span class="dot teal"></span> NODE EXPLORER</div>
+    <div class="module-body">
+      <div style="display:flex;gap:4px;margin-bottom:4px">
+        <input type="text" id="explore-box" placeholder="输入节点名…" onkeydown="if(event.key==='Enter')exploreNode()" style="flex:1;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none">
+        <button class="btn-sm" onclick="exploreNode()" style="flex-shrink:0">GO</button>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;font-size:10px">
+        <span style="color:#888">DEPTH:</span>
+        <select id="explore-depth" onchange="if(document.getElementById('explore-box').value.trim())exploreNode()" style="background:#fff;border:1px solid #ccc;color:var(--text);padding:2px 4px;font-family:var(--mono);font-size:9px;outline:none">
+          <option value="1">1 (direct)</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+        <span id="explore-stats" style="color:#aaa;font-size:9px;margin-left:auto"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 节点模块 -->
+  <div class="module">
+    <div class="module-header"><span class="dot orange"></span> NODE CONTROL <span id="node-mode-badge" class="pill pill-gray" style="margin-left:auto">NEW</span></div>
+    <div class="module-body">
+      <div class="form-row"><label>ID</label><input type="text" id="node-id" placeholder="节点标识"></div>
+      <div class="form-row"><label>WT</label><input type="range" id="node-weight" min="0" max="1" step="0.01" value="0.5" oninput="document.getElementById('node-weight-display').textContent=parseFloat(this.value).toFixed(2)"><span class="val-display" id="node-weight-display">0.50</span></div>
+      <div class="form-row"><label>TYPE</label><select id="node-label">
+        <option value="declarative-semantic">SEMANTIC</option>
+        <option value="declarative-episodic">EPISODIC</option>
+        <option value="procedural">PROCEDURAL</option>
+      </select></div>
+      <div class="form-row"><label>EXEC</label><input type="text" id="node-execution" placeholder="(可选)"></div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="createNode()">CREATE</button>
+        <button class="btn" onclick="updateNode()">UPDATE</button>
+        <button class="btn danger" onclick="deleteNode()">DELETE</button>
+        <button class="btn-sm" onclick="clearNodeForm()">CLR</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 边模块 -->
+  <div class="module" style="flex:0 0 auto;">
+    <div class="module-header"><span class="dot teal"></span> EDGE CONTROL <span id="edge-mode-badge" class="pill pill-gray" style="margin-left:auto">NEW</span></div>
+    <div class="module-body">
+      <div class="form-row"><label>SRC</label><input type="text" id="edge-src" placeholder="起点"></div>
+      <div class="form-row"><label>DST</label><input type="text" id="edge-dst" placeholder="终点"></div>
+      <div class="form-row"><label>REL</label><input type="text" id="edge-relation" placeholder="关系"></div>
+      <div class="form-row"><label>WT</label><input type="range" id="edge-weight" min="-1" max="1" step="0.01" value="0.5" oninput="document.getElementById('edge-weight-display').textContent=parseFloat(this.value).toFixed(2)"><span class="val-display" id="edge-weight-display">0.50</span></div>
+      <div class="btn-row">
+        <button class="btn primary" onclick="createEdge()">CREATE</button>
+        <button class="btn" onclick="updateEdge()">UPDATE</button>
+        <button class="btn danger" onclick="deleteEdge()">DELETE</button>
+        <button class="btn-sm" onclick="clearEdgeForm()">CLR</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 中央图谱区 -->
+<div id="graph-area">
+  <!-- 装饰性技术标签 -->
+  <span class="tech-label" id="tech-tl">N:00.000 E:00.000</span>
+  <span class="tech-label" id="tech-tr">SYS::ANALYSIS</span>
+  <span class="tech-label" id="tech-bl">GRID::ACTIVE</span>
+  <span class="tech-label" id="tech-br">Z:1.00</span>
+
+  <div id="network-container">
+    <div class="graph-pane">
+      <div class="pane-bar">
+        <span class="pane-title">◉ 激活图谱 ACTIVATION</span>
+        <label class="pane-ctl">阈值
+          <select id="act-threshold" onchange="fetchAndRender()" title="仅显示激活度高于该档的节点（图例分档）">
+            <option value="0.05">low（≥0.05）</option>
+            <option value="0.3">mid（≥0.3）</option>
+            <option value="1.0" selected>高激活（≥1.0，高于mid）</option>
+            <option value="2.0">peak（≥2.0）</option>
+          </select>
+        </label>
+      </div>
+      <div class="pane-body">
+        <canvas id="graph-canvas"></canvas>
+        <div id="graph-empty-hint">◈ 当前阈值下无高激活节点 ◈</div>
+      </div>
+    </div>
+    <div class="graph-pane">
+      <div class="pane-bar">
+        <span class="pane-title">◎ 邻域查询 QUERY</span>
+        <span class="pane-center" id="qry-center">未查询</span>
+      </div>
+      <div class="pane-body">
+        <canvas id="query-canvas"></canvas>
+        <div id="query-empty-hint">◈ 在 NODE EXPLORER 输入节点名查询邻居 ◈</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 浮动：TopK 左上 -->
+  <div id="topk-badge">
+    <div class="badge-title">▸ TOP-K CANDIDATES</div>
+    <div style="color:#aaa;font-size:7px">AWAITING INPUT…</div>
+  </div>
+
+  <!-- 浮动：图例 右上 -->
+  <div id="legend">
+    <div class="leg-title">ACTIVATION HEAT</div>
+    <div class="leg-row"><span class="leg-dot" style="background:#d0d0d0;border:1px solid #aaa"></span> DORMANT &lt;0.05</div>
+    <div class="leg-row"><span class="leg-dot" style="background:#90caf9;border:1px solid #42a5f5"></span> LOW 0.05–0.3</div>
+    <div class="leg-row"><span class="leg-dot" style="background:#4dd0e1;border:1px solid #00bcd4"></span> MID 0.3–1.0</div>
+    <div class="leg-row"><span class="leg-dot" style="background:#ff8a65;border:1px solid #ff6b00"></span> HIGH 1.0–2.0</div>
+    <div class="leg-row"><span class="leg-dot" style="background:#ef5350;border:1px solid #c62828"></span> PEAK &gt;2.0</div>
+  </div>
+
+  <!-- 浮动：节点详情 右下 -->
+  <div id="selected-info">
+    <div class="si-header">▸ NODE DETAIL</div>
+    <div class="si-row"><span class="si-key">ID</span><span class="si-val" id="si-id">—</span></div>
+    <div class="si-row"><span class="si-key">WEIGHT</span><span class="si-val" id="si-weight">—</span></div>
+    <div class="si-row"><span class="si-key">ACT</span><span class="si-val" id="si-act">—</span></div>
+    <div class="si-row"><span class="si-key">TYPE</span><span class="si-val" id="si-label">—</span></div>
+    <div class="si-row"><span class="si-key">CREATED</span><span class="si-val" id="si-created">—</span></div>
+    <div class="si-row"><span class="si-key">LOCK</span><span class="si-val" id="si-lock">—</span></div>
+    <div class="si-row" style="gap:4px;justify-content:flex-start">
+      <button class="btn-sm" onclick="lockSelectedNode('blocking')">BLOCK</button>
+      <button class="btn-sm" onclick="lockSelectedNode('non_blocking')">HIDE-ONLY</button>
+    </div>
+  </div>
+</div>
+
+<!-- 右侧面板 -->
+<div id="right-panel">
+
+  <!-- NLP 模块 -->
+  <div class="module" style="flex:0 0 auto;">
+    <div class="module-header"><span class="dot orange"></span> INPUT STREAM</div>
+    <div class="module-body">
+      <textarea id="nlp-input" placeholder="输入自然语言…&#10;Ctrl+Enter 提交&#10;&#10;例如：苹果是一种圆形水果&#10;或：我昨天参加了考试"></textarea>
+      <button id="nlp-submit" onclick="submitNLP()">◆ ANALYZE &amp; DIFFUSE</button>
+      <div id="llm-answer"><div class="answer-label">▸ LLM RESPONSE</div><div id="llm-answer-text"></div></div>
+      <div id="nlp-result"></div>
+      <div id="memory-section" style="margin-top:8px;display:none">
+        <div style="font-family:var(--sans);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--teal-dim);margin-bottom:4px">▸ MEMORY DRAFT</div>
+        <div id="memory-draft"></div>
+        <button class="btn-sm teal" onclick="approveMemory()" style="margin-top:6px">APPROVE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab 模块 -->
+  <div class="module">
+    <div class="tabs-header">
+      <button class="tab-btn active" onclick="switchTab('topk')">Top-K</button>
+      <button class="tab-btn" onclick="switchTab('actions')">Queue</button>
+      <button class="tab-btn" onclick="switchTab('ear')">Ear</button>
+      <button class="tab-btn" onclick="switchTab('vision')">Vision</button>
+      <button class="tab-btn" onclick="switchTab('eye')">Eye</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config</button>
+      <button class="tab-btn" onclick="switchTab('packs')">Packs</button>
+      <button class="tab-btn" onclick="switchTab('learn')">Learn</button>
+      <button class="tab-btn" onclick="switchTab('chatlog')">Chat</button>
+      <button class="tab-btn" onclick="switchTab('reg')">Reg</button>
+      <button class="tab-btn" onclick="switchTab('auto')">Auto</button>
+      <button class="tab-btn" onclick="switchTab('internal')">Internal</button>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px;padding-right:8px">
+        <span style="font-size:8px;color:var(--text-dim)">隐藏临时节点</span>
+        <label class="toggle-switch" style="width:28px;height:14px">
+          <input type="checkbox" id="hide-temp-toggle" checked onchange="toggleHideTemp()">
+          <span class="toggle-slider" style="border-radius:14px"></span>
+        </label>
+      </span>
+    </div>
+    <div class="tab-content active" id="tab-topk"><div id="topk-panel"></div></div>
+    <div class="tab-content" id="tab-actions">
+      <div style="font-family:var(--sans);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:4px">▸ AUTO QUEUE (激活阈值)</div>
+      <div id="action-panel"></div>
+      <div style="font-family:var(--sans);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-top:12px;margin-bottom:4px">▸ MANUAL TRIGGER (所有动作节点)</div>
+      <button class="btn-sm" onclick="fetchManualActions()" style="margin-bottom:4px">REFRESH</button>
+      <div id="manual-action-panel"></div>
+      <div id="exec-result" style="margin-top:8px;font-family:var(--mono);font-size:9px;min-height:30px;white-space:pre-wrap;color:var(--text2)"></div>
+    </div>
+    <div class="tab-content" id="tab-ear">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">EAR 听觉感知</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ear-toggle" onchange="toggleEar()">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="ear-status-text" style="font-family:var(--mono);font-size:8px;color:var(--text-dim)">OFF</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <input type="text" id="ear-audio-path" placeholder="音频文件路径…" style="flex:1;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none">
+        <button class="btn-sm primary" onclick="earProcess()">PROCESS</button>
+      </div>
+      <div id="ear-result" style="font-family:var(--mono);font-size:9px;max-height:200px;overflow-y:auto;white-space:pre-wrap;color:var(--text2);background:#fafafa;padding:6px;border:1px solid #eee"></div>
+      <div id="ear-model-status" style="margin-top:6px;font-family:var(--mono);font-size:8px;color:var(--text-dim)"></div>
+    </div>
+    <div class="tab-content" id="tab-eye">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">EYE 屏幕感知（OCR 文字 + 方位）</span>
+        <span id="eye-status-text" style="font-family:var(--mono);font-size:8px;color:var(--text-dim)">—</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button class="btn-sm primary" onclick="eyeCapture()">截屏识文</button>
+        <span style="font-family:var(--mono);font-size:8px;color:var(--text-dim);align-self:center">本地 OCR，不上传</span>
+      </div>
+      <div id="eye-result" style="font-family:var(--mono);font-size:9px;color:var(--text2);max-height:260px;overflow:auto;white-space:pre-wrap"></div>
+    </div>
+    <div class="tab-content" id="tab-vision">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text2)">VISUAL 视觉感知</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="vision-toggle" onchange="toggleVision()">
+          <span class="toggle-slider"></span>
+        </label>
+        <span id="vision-status-text" style="font-family:var(--mono);font-size:8px;color:var(--text-dim)">OFF</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <input type="text" id="vision-image-path" placeholder="图片文件路径…" style="flex:1;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none">
+        <button class="btn-sm primary" onclick="visionProcess()">PROCESS</button>
+      </div>
+      <div id="vision-vis-container" style="display:none;margin-bottom:6px;text-align:center;background:#1a1a1a;border-radius:4px;overflow:hidden">
+        <img id="vision-vis-img" src="" style="max-width:100%;height:auto;display:block">
+      </div>
+      <button class="btn-sm" onclick="fetchVisionObjects()" style="width:100%;margin-bottom:6px">REFRESH OBJECTS</button>
+      <div id="vision-stats" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-bottom:4px"></div>
+      <div id="vision-objects" style="font-family:var(--mono);font-size:9px;max-height:200px;overflow-y:auto"></div>
+      <div style="margin-top:8px;border-top:1px solid #eee;padding-top:6px">
+        <input type="text" id="vision-confirm-id" placeholder="Object ID" style="width:100%;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none;margin-bottom:4px">
+        <input type="text" id="vision-confirm-name" placeholder="确认名称 (如: 狗)" style="width:100%;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none;margin-bottom:4px">
+        <button class="btn-sm teal" onclick="visionConfirm()" style="width:100%">CONFIRM OBJECT</button>
+      </div>
+      <div id="vision-result" style="margin-top:6px;font-family:var(--mono);font-size:9px;color:var(--text2);white-space:pre-wrap"></div>
+    </div>
+    <div class="tab-content" id="tab-config"><div id="config-panel"></div></div>
+    <div class="tab-content" id="tab-packs">
+      <div style="margin-bottom:8px;display:flex;gap:4px">
+        <button class="btn-sm" onclick="reloadPacks()">RELOAD</button>
+        <button class="btn-sm" onclick="fetchPacks()">REFRESH</button>
+      </div>
+      <div id="packs-list"></div>
+      <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px">
+        <input type="text" id="new-pack-name" placeholder="PACK NAME" style="width:100%;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none;margin-bottom:4px">
+        <button class="btn-sm primary" onclick="createPack()" style="width:100%">CREATE PACK</button>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-learn">
+      <input type="text" id="learn-word" placeholder="核心概念…" style="width:100%;background:#fff;border:1px solid #ccc;color:var(--text);padding:5px 8px;font-family:var(--mono);font-size:10px;outline:none;margin-bottom:4px">
+      <input type="text" id="learn-context" placeholder="附加说明（可选，如：一款Steam生存游戏）…" style="width:100%;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:9px;outline:none;margin-bottom:6px">
+      <button class="btn-sm primary" onclick="learningExplore()" style="width:100%">EXPLORE &amp; EXPAND</button>
+      <div id="learn-result" style="margin-top:8px"></div>
+      <div id="learn-actions" style="margin-top:6px;display:none">
+        <button class="btn teal" onclick="learningImport()" style="width:100%">IMPORT INTO GRAPH</button>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-chatlog">
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+        <input type="text" id="chatlog-search" placeholder="搜索对话…" style="flex:1;background:#fff;border:1px solid #ccc;color:var(--text);padding:4px 8px;font-family:var(--mono);font-size:10px;outline:none"
+          onkeydown="if(event.key==='Enter')searchChatLog()">
+        <button class="btn-sm" onclick="searchChatLog()" style="flex-shrink:0">SEARCH</button>
+        <button class="btn-sm" onclick="fetchChatLog()" style="flex-shrink:0">REFRESH</button>
+      </div>
+      <div id="chatlog-entries" style="max-height:calc(100vh - 420px);overflow-y:auto"></div>
+      <div id="chatlog-stats" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:8px;border-top:1px solid #eee;padding-top:6px"></div>
+    </div>
+
+    <!-- 认知调节：锁 / 状态检测器 / 触发器 -->
+    <div class="tab-content" id="tab-reg">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <span style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--teal-dim)">认知调节 · 锁 / 检测器 / 触发器</span>
+        <button class="btn-sm" style="margin-left:auto" onclick="fetchRegulation()">REFRESH</button>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot teal"></span>LOCKS<span id="reg-lock-count" style="margin-left:auto;color:var(--text-dim)"></span></div>
+        <div class="module-body" style="max-height:240px">
+          <div class="form-row"><span class="cfg-key">对象</span>
+            <input type="text" id="lk-target" placeholder="节点 id；边用 src|关系|dst" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">对象类型</span>
+            <select id="lk-type" style="flex:1;background:#fff;border:1px solid #ccc;font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none">
+              <option value="node">node 节点</option>
+              <option value="edge">edge 边</option>
+            </select>
+          </div>
+          <div class="form-row"><span class="cfg-key">锁型</span>
+            <select id="lk-kind" style="flex:1;background:#fff;border:1px solid #ccc;font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none">
+              <option value="blocking">blocking 阻塞（不参与）</option>
+              <option value="non_blocking">non_blocking 非阻塞（参与不输出）</option>
+            </select>
+          </div>
+          <div class="form-row"><span class="cfg-key">作用范围</span>
+            <select id="lk-scope" style="flex:1;background:#fff;border:1px solid #ccc;font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none">
+              <option value="diffusion">diffusion 注意力扩散</option>
+              <option value="topk">topk 回答区输出</option>
+              <option value="action">action 动作队列</option>
+              <option value="all">all 全部</option>
+            </select>
+          </div>
+          <div class="form-row"><span class="cfg-key">原因</span>
+            <input type="text" id="lk-reason" placeholder="为什么锁（可解释性）" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="btn-row"><button class="btn-sm teal" onclick="createLock()">+ 建锁</button></div>
+          <div id="reg-locks" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot orange"></span>STATE MONITORS<span id="reg-mon-count" style="margin-left:auto;color:var(--text-dim)"></span></div>
+        <div class="module-body" style="max-height:240px">
+          <div class="form-row"><span class="cfg-key">id</span>
+            <input type="text" id="mon-id" placeholder="留空自动生成" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">名称</span>
+            <input type="text" id="mon-name" placeholder="这个检测器在看什么" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">目标</span>
+            <input type="text" id="mon-target" placeholder="被监测对象 id" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">状态类型</span>
+            <select id="mon-state" style="flex:1;background:#fff;border:1px solid #ccc;font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none">
+              <option value="number">number 数值</option>
+              <option value="bool">bool 真假</option>
+              <option value="enum">enum 枚举</option>
+              <option value="string">string 文本</option>
+            </select>
+          </div>
+          <div class="btn-row"><button class="btn-sm teal" onclick="createMonitor()">+ 建检测器</button></div>
+          <div id="reg-monitors" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot orange"></span>TRIGGERS<span id="reg-trig-count" style="margin-left:auto;color:var(--text-dim)"></span></div>
+        <div class="module-body" style="max-height:280px">
+          <div class="form-row"><span class="cfg-key">名称</span>
+            <input type="text" id="tr-name" placeholder="触发器名字" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">检测器</span>
+            <input type="text" id="tr-monitor" placeholder="monitor id 或 *" value="*" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">条件</span>
+            <input type="text" id="tr-cond" placeholder="如 current &gt;= 10 / changed / current == low" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">激活节点</span>
+            <input type="text" id="tr-nodes" placeholder="触发后要激活的图谱节点 id，逗号分隔（可留空）" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+          </div>
+          <div class="form-row"><span class="cfg-key">冷却(秒)</span>
+            <input type="number" id="tr-cooldown" value="0" min="0" style="width:64px;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none">
+            <span class="cfg-key" style="margin-left:10px">LLM 介入</span>
+            <select id="tr-llm" style="background:#fff;border:1px solid #ccc;font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none">
+              <option value="0">0 纯确定性</option>
+              <option value="1">1 结构化辅助</option>
+              <option value="2">2 认知推理</option>
+            </select>
+          </div>
+          <div class="btn-row"><button class="btn-sm teal" onclick="createTrigger()">+ 建触发器</button></div>
+          <div id="reg-triggers" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <div class="module">
+        <div class="module-header"><span class="dot"></span>触发记录 / 认知事件</div>
+        <div class="module-body" style="max-height:200px">
+          <div id="reg-log" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+        </div>
+      </div>
+    </div>
+
+      <div id="chatlog-stats" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:8px;border-top:1px solid #eee;padding-top:6px"></div>
+    </div>
+
+    <!-- 自主行动：状态 / 意图 / 目标 / 日志（信息全部来自真实后端状态） -->
+    <div class="tab-content" id="tab-auto">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <span id="auto-mode-badge" class="pill gray">OFF</span>
+        <span id="auto-phase" style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">—</span>
+        <button class="btn-sm" style="margin-left:auto" onclick="fetchAutonomy()">REFRESH</button>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn-sm teal" onclick="setAutonomy('on')">ON</button>
+        <button class="btn-sm" onclick="setAutonomy('off')">STOP</button>
+        <button class="btn-sm" onclick="autonomyPause()">PAUSE</button>
+        <button class="btn-sm" onclick="autonomyResume()">RESUME</button>
+        <button class="btn-sm" onclick="autonomyStep()">STEP</button>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot orange"></span>当前意图 / 行动</div>
+        <div class="module-body" style="max-height:200px">
+          <div id="auto-current" style="font-family:var(--mono);font-size:9px;line-height:1.7"></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot teal"></span>候选与竞争（可解释）</div>
+        <div class="module-body" style="max-height:230px">
+          <div id="auto-candidates" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+          <div id="auto-drives" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:6px;border-top:1px solid #eee;padding-top:6px"></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot"></span>待办目标</div>
+        <div class="module-body" style="max-height:180px">
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input type="text" id="auto-goal-text" placeholder="用一句话说个目标（走 Mode 1 解析）" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none"
+              onkeydown="if(event.key==='Enter')addAutonomyGoal()">
+            <button class="btn-sm teal" style="flex-shrink:0" onclick="addAutonomyGoal()">ADD</button>
+          </div>
+          <div id="auto-goals" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot teal"></span>对话通道（世界里的聊天）<span id="ch-count" style="margin-left:auto;color:var(--text-dim)"></span></div>
+        <div class="module-body" style="max-height:260px">
+          <div id="ch-list" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="ch-send-text" placeholder="往游戏聊天里发一句（测试）" style="flex:1;background:#fff;border:1px solid #ccc;padding:3px 6px;font-family:var(--mono);font-size:10px;outline:none"
+              onkeydown="if(event.key==='Enter')channelSend()">
+            <button class="btn-sm teal" style="flex-shrink:0" onclick="channelSend()">SAY</button>
+          </div>
+          <div id="ch-events" style="font-family:var(--mono);font-size:9px;line-height:1.6;margin-top:8px;border-top:1px solid #eee;padding-top:6px"></div>
+        </div>
+      </div>
+
+      <div class="module">
+        <div class="module-header"><span class="dot"></span>自主日志</div>
+        <div class="module-body" style="max-height:220px">
+          <div id="auto-log" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+        </div>
+      </div>
+    </div>
+
+      <div id="chatlog-stats" style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:8px;border-top:1px solid #eee;padding-top:6px"></div>
+    </div>
+
+    <!-- 内部状态：需求 / 神经调制 / 性格（激素可调、性格可设定、一切留痕） -->
+    <div class="tab-content" id="tab-internal">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <span style="font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--teal-dim)">内部状态 · 需求 / 调制 / 性格</span>
+        <button class="btn-sm" style="margin-left:auto" onclick="fetchInternal()">REFRESH</button>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot teal"></span>神经调制（可调）<span id="int-cycle" style="margin-left:auto;color:var(--text-dim)"></span></div>
+        <div class="module-body" style="max-height:230px">
+          <div id="int-modulators" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+          <div class="btn-row"><button class="btn-sm" onclick="resetInternal('modulators')">恢复出厂调制值</button></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot orange"></span>需求（经历驱动，不建议手改）</div>
+        <div class="module-body" style="max-height:200px">
+          <div id="int-needs" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+        </div>
+      </div>
+
+      <div class="module" style="margin-bottom:10px">
+        <div class="module-header"><span class="dot"></span>性格（可设定）</div>
+        <div class="module-body" style="max-height:280px">
+          <div id="int-traits" style="font-family:var(--mono);font-size:9px;line-height:1.6"></div>
+          <div class="btn-row">
+            <button class="btn-sm" onclick="resetInternal('traits')">恢复出厂性格</button>
+            <button class="btn-sm" onclick="internalSnapshot(false)">拍摄快照</button>
+            <button class="btn-sm" onclick="internalSnapshot(true)">回滚快照</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="module">
+        <div class="module-header"><span class="dot teal"></span>解释（为什么她现在这样）</div>
+        <div class="module-body" style="max-height:220px">
+          <div id="int-explain" style="font-family:var(--mono);font-size:9px;line-height:1.6;color:var(--text-dim)">点 EXPLAIN 查看最近一轮的因果链</div>
+          <div class="btn-row"><button class="btn-sm" onclick="explainInternal()">EXPLAIN</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /#main -->
+
+<!-- ═════════════════════ 底部控制台 ═════════════════════ -->
+<div id="console-bar" onclick="toggleConsole()">
+  <span id="console-prompt">FASCINATOR&gt;</span>
+  <span id="console-static">HELLO WORLD — 认知图谱系统就绪 // 等待输入…</span>
+  <span class="console-decor">SYS::READY</span>
+  <div id="console-log"></div>
+</div>
+
+<!-- LLM Modal -->
+<div id="llm-modal-overlay" onclick="if(event.target===this)closeLLMSettings()">
+  <div id="llm-modal">
+    <h3>⚙ LLM CONFIGURATION</h3>
+    <label>Provider</label>
+    <select id="llm-provider" onchange="document.getElementById('llm-api-key').style.display=this.value==='ollama'?'none':''">
+      <option value="deepseek">DEEPSEEK API</option>
+      <option value="mimo">MIMO API (XIAOMI)</option>
+    </select>
+    <label>Model</label>
+    <input type="text" id="llm-model" placeholder="qwen2.5:7b-instruct-q5_k_m">
+    <div id="llm-api-key" style="display:none">
+      <label>API Key</label>
+      <input type="password" id="llm-key" placeholder="sk-...">
+    </div>
+    <div class="btn-row">
+      <button class="cancel" onclick="closeLLMSettings()">CANCEL</button>
+      <button class="save" onclick="applyLLMSettings()">APPLY</button>
+    </div>
+    <div id="llm-status"><span class="dot ollama"></span> —</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// GLOBAL STATE
+// ═══════════════════════════════════════════════════════
+const API = (() => { const o = window.location && window.location.origin; if (o && o.startsWith('http')) return o; return 'http://localhost:5000'; })();
+let graphData = { nodes: [], edges: [] };
+let autoRunning = false;
+let autoInterval = null;
+let selectedNodeId = null;
+let selectedEdgeData = null;
+let configData = {};
+let reviewMode = 'graph';
+let reviewDraftNodes = [];
+let reviewDraftEdges = [];
+let graphView = { mode: 'active', center: null, exploreNodeId: null, exploreDepth: 2 };
+let lastGraphNodeCount = 0;
+let llmProvider = 'mimo';
+function ensureOllamaOption(on){var sel=document.getElementById('llm-provider');var ex=sel.querySelector('option[value=ollama]');
+  if(on&&!ex){var o=document.createElement('option');o.value='ollama';o.textContent='OLLAMA (LOCAL)';sel.insertBefore(o,sel.firstChild);}
+  if(!on&&ex){if(sel.value==='ollama')sel.value='mimo';ex.remove();}}
+
+// ═══════════════════════════════════════════════════════
+// UTILITY
+// ═══════════════════════════════════════════════════════
+function labelStr(lbl) {
+  if (lbl === 'declarative-episodic') return 'EPISODIC';
+  if (lbl === 'procedural') return 'PROCEDURAL';
+  if (lbl === 'declarative-semantic') return 'SEMANTIC';
+  return String(lbl).toUpperCase();
+}
+function escapeHtml(s) { var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ═══════════════════════════════════════════════════════
+// CANVAS GRAPH ENGINE
+// ═══════════════════════════════════════════════════════
+// ── 画布引擎（双子视图工厂重构 2026-09-19）──
+// 左=激活图谱（按阈值轮询刷新）；右=邻域查询（查询后冻结，不再被轮询劫持）。
+// 每个面板拥有独立的物理/渲染/交互状态；公共入口函数名保持不变。
+var queryGraphData = {nodes: [], edges: []};
+var actPane = null, qryPane = null;
+
+function makeGraphPane(canvasId, hintId, opts) {
+  opts = opts || {};
+  var cv = document.getElementById(canvasId); if (!cv) return null;
+  var ctx = cv.getContext('2d');
+  var gn = [], ge = [], drag = null, gox = 0, goy = 0;
+  var ox = 0, oy = 0, z = 1.0, hvN = null, hvE = null, pmx = 0, pmy = 0;
+
+  function rz() {
+    var r = cv.parentElement; if (!r) return;
+    var w = r.clientWidth, h = r.clientHeight, d = devicePixelRatio || 1;
+    cv.width = w * d; cv.height = h * d;
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+  }
+  rz(); window.addEventListener('resize', rz);
+
+  function stw(e) {
+    var r = cv.getBoundingClientRect();
+    return {x: (e.clientX - r.left - r.width / 2) / z + ox,
+            y: (e.clientY - r.top - r.height / 2) / z + oy};
+  }
+  function nr(n) { return 8 + Math.min(n.activation || 0, 3) * 6; }
+  function nbyid(id) { for (var i = 0; i < gn.length; i++) if (gn[i].id === id) return gn[i]; return null; }
+  function htn(wx, wy) {
+    for (var i = gn.length - 1; i >= 0; i--) { var n = gn[i], r = nr(n) + 4, dx = wx - n.x, dy = wy - n.y;
+      if (dx * dx + dy * dy < r * r) return n; }
+    return null;
+  }
+  function hte(wx, wy) {
+    for (var i = 0; i < ge.length; i++) { var e = ge[i], sn = nbyid(e.src), dn = nbyid(e.dst);
+      if (!sn || !dn) continue;
+      var dx = dn.x - sn.x, dy = dn.y - sn.y, len = Math.sqrt(dx * dx + dy * dy); if (len < 1) continue;
+      var t = Math.max(0, Math.min(1, ((wx - sn.x) * dx + (wy - sn.y) * dy) / (len * len)));
+      var px = sn.x + t * dx, py = sn.y + t * dy;
+      if (Math.sqrt((wx - px) * (wx - px) + (wy - py) * (wy - py)) < 8) return e; }
+    return null;
+  }
+
+  cv.addEventListener('mousedown', function(e) {
+    var p = stw(e); var k = htn(p.x, p.y);
+    if (k) { drag = k; gox = k.x - p.x; goy = k.y - p.y; selectedNodeId = k.id;
+      cv.style.cursor = 'grabbing'; try { onSelectNode(k.id); } catch (_) {} e.preventDefault(); }
+    else { var ed = hte(p.x, p.y);
+      if (ed) { try { onSelectEdge(ed); } catch (_) {} selectedNodeId = null; e.preventDefault(); }
+      else { selectedNodeId = null;
+        try { document.getElementById('selected-info').style.display = 'none'; } catch (_) {}
+        drag = 'pan'; pmx = e.clientX; pmy = e.clientY; cv.style.cursor = 'grabbing'; } }
+  });
+  cv.addEventListener('mousemove', function(e) {
+    if (drag && drag !== 'pan') { var p = stw(e); drag.x = p.x + gox; drag.y = p.y + goy; }
+    else if (drag === 'pan') { var dx = e.clientX - pmx, dy = e.clientY - pmy;
+      pmx = e.clientX; pmy = e.clientY; ox += dx / z; oy += dy / z; }
+    else { var p2 = stw(e); hvN = htn(p2.x, p2.y); hvE = hvN ? null : hte(p2.x, p2.y); }
+  });
+  window.addEventListener('mouseup', function() { drag = null; cv.style.cursor = 'grab'; });
+  cv.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var f = e.deltaY < 0 ? 1.1 : 0.9, nz = Math.max(0.1, Math.min(5, z * f));
+    var r = cv.getBoundingClientRect(); var mx = e.clientX - r.left, my = e.clientY - r.top;
+    ox -= mx / nz - mx / z; oy -= my / nz - my / z; z = nz;
+    if (opts.zoomLabel) { var el = document.getElementById(opts.zoomLabel);
+      if (el) el.textContent = 'Z:' + z.toFixed(2); }
+  }, {passive: false});
+  cv.addEventListener('touchstart', function(e) {
+    if (e.touches.length === 1) {
+      var r = cv.getBoundingClientRect();
+      var p = {x: (e.touches[0].clientX - r.left - r.width / 2) / z + ox,
+               y: (e.touches[0].clientY - r.top - r.height / 2) / z + oy};
+      var k = htn(p.x, p.y);
+      if (k) { drag = k; gox = k.x - p.x; goy = k.y - p.y; }
+      else { drag = 'pan'; pmx = e.touches[0].clientX; pmy = e.touches[0].clientY; }
+    } else if (e.touches.length === 2) { drag = null; }
+  }, {passive: false});
+  cv.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+    if (drag === 'pan' && e.touches.length === 1) {
+      var dx = e.touches[0].clientX - pmx, dy = e.touches[0].clientY - pmy;
+      pmx = e.touches[0].clientX; pmy = e.touches[0].clientY; ox += dx / z; oy += dy / z; }
+  }, {passive: false});
+  cv.addEventListener('touchend', function() { drag = null; });
+
+  function step() {
+    if (drag && drag !== 'pan') return; if (gn.length < 2) return;
+    var i, j;
+    for (i = 0; i < gn.length; i++) { gn[i].vx = gn[i].vx || 0; gn[i].vy = gn[i].vy || 0; }
+    for (i = 0; i < gn.length; i++) { var a = gn[i];
+      if (!a.x) { a.x = (Math.random() - 0.5) * 200; a.y = (Math.random() - 0.5) * 200; }
+      for (j = i + 1; j < gn.length; j++) { var b = gn[j];
+        if (!b.x) { b.x = (Math.random() - 0.5) * 200; b.y = (Math.random() - 0.5) * 200; }
+        var dx = b.x - a.x, dy = b.y - a.y, dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        var force = 600 / (dist * dist), fx = dx / dist * force, fy = dy / dist * force;
+        a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy; }
+      a.vx += -a.x * 0.001; a.vy += -a.y * 0.001; }
+    for (i = 0; i < ge.length; i++) { var e = ge[i], sn = nbyid(e.src), dn = nbyid(e.dst);
+      if (!sn || !dn) continue;
+      var ddx = dn.x - sn.x, ddy = dn.y - sn.y, dlen = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
+      var target = 100 + (e.weight || 0.5) * 60, frc = (dlen - target) * 0.01;
+      var ffx = ddx / dlen * frc, ffy = ddy / dlen * frc;
+      sn.vx += ffx; sn.vy += ffy; dn.vx -= ffx; dn.vy -= ffy; }
+    for (i = 0; i < gn.length; i++) { gn[i].vx *= 0.85; gn[i].vy *= 0.85;
+      gn[i].x += gn[i].vx; gn[i].y += gn[i].vy; }
+  }
+
+  function render() {
+    var w = cv.width / (devicePixelRatio || 1), h = cv.height / (devicePixelRatio || 1);
+    ctx.clearRect(0, 0, w, h);
+    ctx.save(); ctx.translate(w / 2, h / 2); ctx.scale(z, z); ctx.translate(-ox, -oy);
+    var i;
+    for (i = 0; i < ge.length; i++) { var e = ge[i], sn = nbyid(e.src), dn = nbyid(e.dst);
+      if (!sn || !dn) continue;
+      var a = e.activation || 0, alpha = 0.18 + Math.min(a, 1) * 0.45;
+      var rr = a > 0.3 ? 0 : 60, gg = a > 0.3 ? 150 : 80, bb = a > 0.3 ? 160 : 120;
+      if (e === hvE) { alpha = 0.95; rr = 0; gg = 130; bb = 140; }
+      var dx = dn.x - sn.x, dy = dn.y - sn.y;
+      ctx.beginPath(); ctx.moveTo(sn.x, sn.y); ctx.lineTo(dn.x, dn.y);
+      ctx.strokeStyle = 'rgba(' + rr + ',' + gg + ',' + bb + ',' + alpha + ')';
+      ctx.lineWidth = 1 + Math.abs(e.weight || 0.5) * 1.5; ctx.stroke();
+      var len = Math.sqrt(dx * dx + dy * dy); if (len < 1) continue;
+      var nr2 = nr(dn) + 6, ex = dn.x - dx / len * nr2, ey = dn.y - dy / len * nr2, aw = 6;
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - dx / len * aw + dy / len * aw * 0.5, ey - dy / len * aw - dx / len * aw * 0.5);
+      ctx.lineTo(ex - dx / len * aw - dy / len * aw * 0.5, ey - dy / len * aw + dx / len * aw * 0.5);
+      ctx.closePath(); ctx.fillStyle = 'rgba(' + rr + ',' + gg + ',' + bb + ',' + alpha + ')'; ctx.fill();
+      if (z > 0.5 && e.label) { var mx = (sn.x + dn.x) / 2, my = (sn.y + dn.y) / 2;
+        ctx.fillStyle = 'rgba(80,80,80,0.7)'; ctx.font = '8px "Share Tech Mono",monospace';
+        ctx.textAlign = 'center'; ctx.fillText(e.label, mx, my - 4); } }
+    for (i = 0; i < gn.length; i++) { var n = gn[i], act = n.activation || 0, rad = nr(n);
+      var bcol = n.label === 'procedural' ? '#7c4dff' : n.label === 'declarative-episodic' ? '#00c853' : '#ff6b00';
+      var fcol = act < 0.05 ? '#e0e0e0' : act < 0.3 ? '#bbdefb' : act < 1 ? '#80deea' : act < 2 ? '#ffab91' : '#ef9a9a';
+      var alpha2 = 0.7 + Math.min(act, 3) * 0.1;
+      if (n === hvN) { alpha2 = 1; fcol = '#00d2d3'; bcol = '#ff6b00'; }
+      if (n.id === selectedNodeId) { bcol = '#1a1a1a'; }
+      if (act > 0.3) { ctx.beginPath(); ctx.arc(n.x, n.y, rad + 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + (act > 1 ? '255,107,0' : '0,210,211') + ',0.15)'; ctx.fill(); }
+      ctx.beginPath(); ctx.arc(n.x, n.y, rad, 0, Math.PI * 2);
+      ctx.fillStyle = fcol; ctx.globalAlpha = alpha2; ctx.fill(); ctx.globalAlpha = 1;
+      ctx.lineWidth = n.id === selectedNodeId ? 2.5 : 1.5; ctx.strokeStyle = bcol; ctx.stroke();
+      if (z > 0.4) { ctx.fillStyle = '#1a1a1a';
+        ctx.font = (10 + Math.min(act, 2) * 2) + 'px "Share Tech Mono","Barlow Semi Condensed",monospace';
+        ctx.textAlign = 'center'; ctx.fillText(n.id, n.x, n.y - rad - 8); } }
+    ctx.restore();
+  }
+  (function lp() { step(); render(); requestAnimationFrame(lp); })();
+
+  return {
+    nodes: function() { return gn; },
+    recenter: function() { ox = 0; oy = 0; z = 1.0; },
+    setData: function(nodes, edges) {
+      nodes = nodes || []; edges = edges || [];
+      var op = {}; for (var i = 0; i < gn.length; i++) op[gn[i].id] = {x: gn[i].x, y: gn[i].y};
+      var nn = [];
+      for (var i = 0; i < nodes.length; i++) { var nd = nodes[i], o = op[nd.id];
+        nn.push({id: nd.id, x: o ? o.x : (Math.random() - 0.5) * 200,
+                 y: o ? o.y : (Math.random() - 0.5) * 200,
+                 vx: 0, vy: 0, activation: nd.activation || 0,
+                 weight: nd.weight || 0.5, label: nd.label || ''}); }
+      gn = nn;
+      var ne = [];
+      for (var i = 0; i < edges.length; i++) { var e = edges[i];
+        var s = e.src || e.from || '', d = e.dst || e.to || '';
+        if (s && d) ne.push({src: s, dst: d, label: e.relation || e.type || 'REL',
+                             weight: e.weight || 0.5, activation: e.activation || 0}); }
+      ge = ne;
+      var hint = hintId ? document.getElementById(hintId) : null;
+      if (hint) hint.style.display = gn.length ? 'none' : 'flex';
+      if (opts.onData) opts.onData(gn.length, ge.length);
+    }
+  };
+}
+
+function initCanvasGraph() {
+  actPane = makeGraphPane('graph-canvas', 'graph-empty-hint', {
+    zoomLabel: 'tech-br',
+    onData: function(nn, ee) {
+      try {
+        document.getElementById('graph-stats').textContent = 'N:' + nn + ' / E:' + ee;
+        document.getElementById('tech-tl').textContent = 'N:' + nn + ' E:' + ee;
+      } catch (_) {}
+      lastGraphNodeCount = nn;
+    }
+  });
+  qryPane = makeGraphPane('query-canvas', 'query-empty-hint', {
+    onData: function(nn, ee) {
+      try { document.getElementById('explore-stats').textContent = '查询: N:' + nn + ' E:' + ee; } catch (_) {}
+    }
+  });
+}
+
+function updateCanvasGraph() {
+  if (actPane) actPane.setData(graphData.nodes || [], graphData.edges || []);
+}
+
+function updateGraphBadge() {
+  var el = document.getElementById('topk-badge'); if (!el) return;
+  var src = actPane ? actPane.nodes() : [];
+  var sorted = src.slice().sort(function(a, b) { return (b.activation || 0) - (a.activation || 0); }).slice(0, 8);
+  var html = '<div class="badge-title">▸ TOP-K CANDIDATES</div>';
+  if (sorted.length === 0) { html += '<div style="color:#aaa;font-size:7px">AWAITING INPUT…</div>'; }
+  for (var i = 0; i < sorted.length; i++) { var n = sorted[i], l = n.label || 'declarative-semantic';
+    var cls = l === 'declarative-episodic' ? 'lbl-episodic' : l === 'procedural' ? 'lbl-procedural' : 'lbl-semantic';
+    var txt = l === 'declarative-episodic' ? 'EPI' : l === 'procedural' ? 'PRO' : 'SEM';
+    html += '<div class="topk-item" onclick="onSelectNode(\'' + escapeHtml(n.id) + '\')"><span class="topk-name">' + escapeHtml(n.id) + '<span class="topk-label-badge ' + cls + '">' + txt + '</span></span><span class="topk-act">' + n.activation.toFixed(2) + '</span></div>'; }
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+// NODE SELECTION
+// ═══════════════════════════════════════════════════════
+function onSelectNode(nid){
+  selectedNodeId=nid;var nd=(graphData.nodes||[]).find(function(n){return n.id===nid;})||(queryGraphData.nodes||[]).find(function(n){return n.id===nid;});if(!nd)return;
+  document.getElementById('node-id').value=nd.id;document.getElementById('node-weight').value=nd.weight;
+  document.getElementById('node-weight-display').textContent=parseFloat(nd.weight).toFixed(2);
+  document.getElementById('node-label').value=nd.label;document.getElementById('node-execution').value=nd.execution||'';
+  document.getElementById('node-mode-badge').textContent='EDIT';
+  var si=document.getElementById('selected-info');si.style.display='block';
+  document.getElementById('si-id').textContent=nd.id;document.getElementById('si-weight').textContent=nd.weight.toFixed(3);
+  document.getElementById('si-act').textContent=nd.activation.toFixed(4);document.getElementById('si-label').textContent=labelStr(nd.label);
+  document.getElementById('si-created').textContent=nd.created||'—';
+  updateSelectedLockBadge();
+}
+function onSelectEdge(edge){
+  selectedEdgeData=edge;
+  document.getElementById('edge-src').value=edge.src||'';document.getElementById('edge-dst').value=edge.dst||'';
+  document.getElementById('edge-relation').value=edge.label||'';
+  var ed=(graphData.edges||[]).concat(queryGraphData.edges||[]).find(function(e){return e.src===edge.src&&e.dst===edge.dst&&(e.relation||e.type||'')===(edge.label||'');});
+  if(ed){document.getElementById('edge-weight').value=ed.weight;document.getElementById('edge-weight-display').textContent=parseFloat(ed.weight).toFixed(2);}
+  document.getElementById('edge-mode-badge').textContent='EDIT';
+}
+
+// ═══════════════════════════════════════════════════════
+// API HELPERS
+// ═══════════════════════════════════════════════════════
+async function api(method,path,body){
+  try{var opts={method:method,headers:{'Content-Type':'application/json'}};if(body)opts.body=JSON.stringify(body);
+    var res=await fetch(API+path,opts);var ct=(res.headers.get('content-type')||'').toLowerCase();
+    if(!ct.includes('application/json')){await res.text();throw new Error('非JSON: '+path+' ('+res.status+')');}
+    var data=await res.json();if(!res.ok)throw new Error(data.error||res.statusText);return data;}
+  catch(err){toast(err.message,'error');throw err;}
+}
+function toast(msg,type){
+  type=type||'';var el=document.getElementById('toast');if(!el){alert(msg);return;}
+  el.textContent=msg;el.className='show '+type;clearTimeout(el._timer);
+  el._timer=setTimeout(function(){el.className='';},2800);
+}
+
+// ═══════════════════════════════════════════════════════
+// GRAPH FETCH
+// ═══════════════════════════════════════════════════════
+async function fetchAndRender(){
+  try{
+    // 双子视图（2026-09-19）：轮询只刷新左栏激活图谱，阈值取图例分档
+    // （默认 ≥1.0=高于 mid）；右栏邻域查询结果保持冻结，不再互相劫持
+    var thSel=document.getElementById('act-threshold');
+    var thr=thSel?thSel.value:'1.0';
+    var data=await api('GET','/api/graph?threshold='+encodeURIComponent(thr));
+    graphView.mode='active'; graphView.center=null;
+    graphData={nodes:data.nodes||[],edges:data.edges||[]};
+    updateCanvasGraph();updateGraphBadge();
+  } catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════
+// NODE CRUD
+// ═══════════════════════════════════════════════════════
+async function createNode(){
+  var nid=document.getElementById('node-id').value.trim();if(!nid){toast('ID required','error');return;}
+  await api('POST','/api/nodes',{id:nid,weight:parseFloat(document.getElementById('node-weight').value),label:document.getElementById('node-label').value,execution:document.getElementById('node-execution').value.trim()||null});
+  toast('NODE '+nid+' CREATED','success');await fetchAndRender();clearNodeForm();
+}
+async function updateNode(){
+  var oldId=selectedNodeId||document.getElementById('node-id').value.trim();var newId=document.getElementById('node-id').value.trim();
+  if(!oldId){toast('Select a node first','error');return;}
+  var body={weight:parseFloat(document.getElementById('node-weight').value),label:document.getElementById('node-label').value,execution:document.getElementById('node-execution').value.trim()||null};
+  if(newId!==oldId)body.new_id=newId;
+  var res=await api('PUT','/api/nodes/'+encodeURIComponent(oldId),body);
+  if(res&&res.new_id)selectedNodeId=res.new_id;toast('NODE UPDATED','success');await fetchAndRender();
+}
+async function deleteNode(){
+  var nid=selectedNodeId||document.getElementById('node-id').value.trim();if(!nid){toast('Select a node first','error');return;}
+  if(!confirm('DELETE NODE "'+nid+'" AND ALL EDGES?'))return;
+  await api('DELETE','/api/nodes/'+encodeURIComponent(nid));toast('NODE '+nid+' DELETED','success');
+  selectedNodeId=null;document.getElementById('selected-info').style.display='none';await fetchAndRender();clearNodeForm();
+}
+function clearNodeForm(){
+  document.getElementById('node-id').value='';document.getElementById('node-weight').value=0.5;
+  document.getElementById('node-weight-display').textContent='0.50';document.getElementById('node-label').value='declarative-semantic';
+  document.getElementById('node-execution').value='';document.getElementById('node-mode-badge').textContent='NEW';
+}
+
+// ═══════════════════════════════════════════════════════
+// EDGE CRUD
+// ═══════════════════════════════════════════════════════
+async function createEdge(){
+  var src=document.getElementById('edge-src').value.trim(),dst=document.getElementById('edge-dst').value.trim(),rel=document.getElementById('edge-relation').value.trim();
+  if(!src||!dst||!rel){toast('SRC/DST/REL required','error');return;}
+  await api('POST','/api/edges',{src:src,dst:dst,relation:rel,weight:parseFloat(document.getElementById('edge-weight').value)});
+  toast('EDGE CREATED','success');await fetchAndRender();clearEdgeForm();
+}
+async function updateEdge(){
+  var src=document.getElementById('edge-src').value.trim(),dst=document.getElementById('edge-dst').value.trim(),rel=document.getElementById('edge-relation').value.trim();
+  if(!src||!dst||!rel){toast('Select an edge first','error');return;}
+  await api('PUT','/api/edges',{src:src,dst:dst,relation:rel,weight:parseFloat(document.getElementById('edge-weight').value)});
+  toast('EDGE UPDATED','success');await fetchAndRender();
+}
+async function deleteEdge(){
+  var src=document.getElementById('edge-src').value.trim(),dst=document.getElementById('edge-dst').value.trim(),rel=document.getElementById('edge-relation').value.trim();
+  if(!src||!dst||!rel){toast('Select an edge first','error');return;}
+  await api('DELETE','/api/edges',{src:src,dst:dst,relation:rel});toast('EDGE DELETED','success');await fetchAndRender();clearEdgeForm();
+}
+function clearEdgeForm(){
+  document.getElementById('edge-src').value='';document.getElementById('edge-dst').value='';document.getElementById('edge-relation').value='';
+  document.getElementById('edge-weight').value=0.5;document.getElementById('edge-weight-display').textContent='0.50';
+  document.getElementById('edge-mode-badge').textContent='NEW';
+}
+
+// ═══════════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════════
+async function exploreNode(){
+  var q=document.getElementById('explore-box').value.trim();
+  if(!q){return;}   // 深度下拉触发的空查询静默跳过（不再误弹错误）
+  var depth=parseInt(document.getElementById('explore-depth').value)||2;
+  graphView.exploreNodeId=q; graphView.exploreDepth=depth;
+  try{
+    var data=await api('GET','/api/graph/auto?max_nodes=2500&depth='+depth+'&center='+encodeURIComponent(q));
+    // 渲染进右栏查询面板：冻结显示，不被轮询刷新
+    queryGraphData={nodes:data.nodes||[],edges:data.edges||[]};
+    if(qryPane){qryPane.recenter();qryPane.setData(queryGraphData.nodes,queryGraphData.edges);}
+    var pc=document.getElementById('qry-center');
+    var found=(data.nodes||[]).length>0;
+    if(pc) pc.textContent=found?('中心: '+(data.center||q)+' · 深度'+depth):'未找到: '+q;
+    if(!found){toast('Node not found: '+q,'error');}
+    else{toast('EXPLORED: '+(data.center||q)+' (depth='+depth+')','success');}
+  }catch(e){toast('Explore failed','error');}
+}
+
+// ═══════════════════════════════════════════════════════
+// NLP
+// ═══════════════════════════════════════════════════════
+async function submitNLP(){
+  var text=document.getElementById('nlp-input').value.trim();if(!text){toast('Enter text','error');return;}
+  var btn=document.getElementById('nlp-submit');btn.disabled=true;btn.textContent='PROCESSING…';
+  try{var data=await api('POST','/api/nlp',{text:text});
+    // 响应 graph 是无阈值活跃前沿快照（几百节点）——不再直接灌进
+    // 激活视图；按当前阈值档重拉，与轮询一致
+    await fetchAndRender();
+    var parsed=data.parsed||{};var resultHtml='';
+    if(parsed.assertion_type){resultHtml+='<span class="speech-act-tag">'+escapeHtml(parsed.assertion_type.toUpperCase())+'</span>';}
+    if(parsed.nodes&&parsed.nodes.length){resultHtml+='<div class="nlp-section-title">ENTITIES</div>';for(var i=0;i<parsed.nodes.length;i++){resultHtml+='<span class="node-tag">'+escapeHtml(parsed.nodes[i])+'</span> ';}}
+    if(parsed.edges&&parsed.edges.length){resultHtml+='<div class="nlp-section-title">RELATIONS</div>';for(var i=0;i<parsed.edges.length;i++){var e=parsed.edges[i];resultHtml+='<span class="edge-tag">'+escapeHtml(e.src)+' <span>→['+escapeHtml(e.type||e.relation)+']→</span> '+escapeHtml(e.dst)+'</span>';}}
+    document.getElementById('nlp-result').innerHTML=resultHtml||'<span style="color:#aaa">(NO ENTITIES/RELATIONS)</span>';
+    if(data.answer){document.getElementById('llm-answer').style.display='block';
+      var prefix='';
+      if(data.curiosity&&data.curiosity.active){prefix='<span style=\"color:#ff6b00;font-weight:600\">[CURIOSITY]</span> ';}
+      else if(data.curiosity_resolved){prefix='<span style=\"color:#10a860;font-weight:600\">[ANSWERED]</span> ';}
+      document.getElementById('llm-answer-text').innerHTML=prefix+escapeHtml(data.answer);}
+    else{document.getElementById('llm-answer').style.display='none';}
+    if(data.memory_draft){document.getElementById('memory-section').style.display='block';var draft=data.memory_draft;reviewDraftNodes=draft.nodes||[];reviewDraftEdges=draft.edges||[];document.getElementById('memory-draft').innerHTML='<span style="color:#888">NODES: '+reviewDraftNodes.length+' / EDGES: '+reviewDraftEdges.length+' — PENDING REVIEW</span>';}
+    else{document.getElementById('memory-section').style.display='none';}
+    fetchTopKPanel();addConsole(text,(data.answer||'(NO ANSWER)').substring(0,80));
+    // Auto-refresh chat log if that tab is active
+    if(document.getElementById('tab-chatlog').classList.contains('active')){fetchChatLog();}
+  }catch(e){}finally{btn.disabled=false;btn.textContent='◆ ANALYZE & DIFFUSE';}
+}
+async function approveMemory(){
+  if(!reviewDraftNodes.length){toast('No draft','error');return;}
+  var text=document.getElementById('nlp-input').value.trim();
+  await api('POST','/api/memory/approve',{draft:{nodes:reviewDraftNodes,edges:reviewDraftEdges},original_text:text});
+  toast('MEMORY APPROVED','success');document.getElementById('memory-section').style.display='none';reviewDraftNodes=[];reviewDraftEdges=[];await fetchAndRender();
+}
+
+// ═══════════════════════════════════════════════════════
+// DIFFUSION
+// ═══════════════════════════════════════════════════════
+async function toggleAuto(){if(autoRunning){await stopAuto();}else{await startAuto();}}
+async function startAuto(){await api('POST','/api/diffuse/start');autoRunning=true;updateAutoUI();autoInterval=setInterval(async function(){try{await fetchAndRender();fetchTopKPanel();fetchActionQueue();}catch(e){}},3000);toast('AUTO DIFFUSION STARTED','success');}
+async function stopAuto(){await api('POST','/api/diffuse/stop');autoRunning=false;updateAutoUI();if(autoInterval){clearInterval(autoInterval);autoInterval=null;}toast('AUTO DIFFUSION STOPPED','success');}
+function updateAutoUI(){
+  var blip=document.getElementById('status-blip'),label=document.getElementById('status-text'),btn=document.getElementById('btn-auto');
+  if(autoRunning){blip.className='active';label.textContent='DIFFUSING';btn.textContent='■ STOP';btn.classList.add('active');}
+  else{blip.className='online';label.textContent='ONLINE';btn.textContent='▶ DIFFUSE';btn.classList.remove('active');}
+}
+async function diffuseStep(){await api('POST','/api/diffuse/step');await fetchAndRender();toast('STEP COMPLETE','success');}
+async function diffuseRound(){await api('POST','/api/diffuse/round');await fetchAndRender();toast('ROUND COMPLETE','success');}
+async function resetAll(){if(!confirm('RESET ALL ACTIVATIONS?'))return;const r=await api('POST','/api/activate/reset',{});await fetchAndRender();toast(r.message||'RESET','success');}
+
+// ═══════════════════════════════════════════════════════
+// TOP-K & ACTION QUEUE
+// ═══════════════════════════════════════════════════════
+async function fetchTopKPanel(){
+  try{var data=await api('GET','/api/topk');var html='';
+    if(data.nodes&&data.nodes.length){for(var i=0;i<data.nodes.length;i++){var n=data.nodes[i],a=n.activation||0;var w=Math.min(100,Math.max(0,a*30));html+='<div class="topk-list-item" onclick="onSelectNode(\''+escapeHtml(n.id)+'\')"><div class="tli-head"><span class="tli-id">'+escapeHtml(n.id)+'</span><span class="tli-act" style="color:'+(a>2?'#e03030':a>1?'#ff6b00':a>0.3?'#009a9b':'#42a5f5')+'">'+a.toFixed(2)+'</span></div><div class="act-bar" style="width:'+w+'%;background:'+(a>2?'#e03030':a>1?'#ff6b00':a>0.3?'#00d2d3':'#42a5f5')+'"></div></div>';}}
+    else{html='<div style="color:#aaa;font-size:10px">NO ACTIVE NODES</div>';}
+    document.getElementById('topk-panel').innerHTML=html;}catch(e){}
+}
+async function fetchActionQueue(){
+  try{var data=await api('GET','/api/actions/queue');var html='';var queue=data.queue||[];
+    if(queue.length){for(var i=0;i<queue.length;i++){var a=queue[i];html+='<div class="action-item"><span class="ai-name">'+escapeHtml(a.node_id)+'</span><span class="ai-act">'+a.activation.toFixed(3)+'</span><button class="exec-btn" onclick="execAction(\''+escapeHtml(a.node_id)+'\')">EXEC</button></div>';}}
+    else{html='<div style="color:#aaa;font-size:10px">QUEUE EMPTY</div>';}
+    document.getElementById('action-panel').innerHTML=html;}catch(e){}
+}
+async function fetchManualActions(){
+  try{var data=await api('GET','/api/actions/registered');var html='';var nodes=data.graph_procedural||[];
+    if(nodes.length){for(var i=0;i<nodes.length;i++){var n=nodes[i];html+='<div class="action-item"><span class="ai-name">'+escapeHtml(n.node_id)+'</span><span class="ai-act">act:'+n.activation.toFixed(2)+(n.registered?' R':'')+'</span><button class="exec-btn" onclick="execAction(\''+escapeHtml(n.node_id)+'\')">EXEC</button></div>';}}
+    else{html='<div style="color:#aaa;font-size:10px">NO PROCEDURAL NODES</div>';}
+    document.getElementById('manual-action-panel').innerHTML=html;}catch(e){}
+}
+async function execAction(nodeId){
+  try{var data=await api('POST','/api/actions/execute',{node_id:nodeId});var el=document.getElementById('exec-result');el.innerHTML=data.success?'OK: '+JSON.stringify(data,null,2):'ERR: '+JSON.stringify(data,null,2);await fetchAndRender();}catch(e){}
+}
+async function toggleHideTemp(){
+  var on=document.getElementById('hide-temp-toggle').checked;
+  await api('PUT','/api/config',{hide_temp_nodes:on});
+  await fetchAndRender();toast('TEMP NODES '+(on?'HIDDEN':'SHOWN'),'success');
+}
+
+// ═══════════════════════════════════════════════════════
+// EAR 听觉感知
+// ═══════════════════════════════════════════════════════
+async function fetchEarStatus(){
+  try{var d=await api('GET','/api/ear/status');
+    document.getElementById('ear-toggle').checked=d.enabled;
+    document.getElementById('ear-status-text').textContent=d.enabled?'ON':'OFF';
+    var ms='Models: ';ms+='YAMNet:'+(d.models&&d.models.yamnet?'OK':'MISS')+' ';
+    ms+='ASR:'+(d.models&&d.models.asr?'OK':'MISS')+' ';
+    ms+='Emo:'+(d.models&&d.models.emotion?'OK':'MISS');
+    document.getElementById('ear-model-status').textContent=ms;
+  }catch(e){}
+}
+async function toggleEar(){
+  var on=document.getElementById('ear-toggle').checked;
+  if(on){await api('POST','/api/ear/enable');}
+  else{await api('POST','/api/ear/disable');}
+  fetchEarStatus();toast('Ear '+(on?'ENABLED':'DISABLED'),'success');
+}
+async function earProcess(){
+  var p=document.getElementById('ear-audio-path').value.trim();
+  if(!p){toast('请输入音频文件路径','error');return;}
+  var el=document.getElementById('ear-result');el.textContent='Processing...';
+  try{var d=await api('POST','/api/ear/process',{audio_path:p});
+    el.textContent=JSON.stringify(d,null,2);toast('Ear PROCESS OK','success');
+  }catch(e){el.textContent='Error: '+e;toast('Ear PROCESS FAILED','error');}
+}
+
+// ═══════════════════════════════════════════════════════
+// VISION 视觉感知
+// ═══════════════════════════════════════════════════════
+async function fetchVisionStatus(){
+  try{var d=await api('GET','/api/vision/status');
+    document.getElementById('vision-toggle').checked=d.enabled;
+    document.getElementById('vision-status-text').textContent=d.enabled?'ON':'OFF';
+  }catch(e){}
+}
+async function toggleVision(){
+  var on=document.getElementById('vision-toggle').checked;
+  if(on){await api('POST','/api/vision/enable');}
+  else{await api('POST','/api/vision/disable');}
+  fetchVisionStatus();toast('Vision '+(on?'ENABLED':'DISABLED'),'success');
+}
+async function visionProcess(){
+  var p=document.getElementById('vision-image-path').value.trim();
+  if(!p){toast('请输入图片文件路径','error');return;}
+  var el=document.getElementById('vision-result');el.textContent='Processing...';
+  try{var d=await api('POST','/api/vision/process',{image_path:p});
+    el.textContent=JSON.stringify(d,null,2);fetchVisionObjects();
+    // 显示可视化
+    var vis=d.visualization;
+    var container=document.getElementById('vision-vis-container');
+    var img=document.getElementById('vision-vis-img');
+    if(vis){
+      img.src=vis;container.style.display='block';
+    }else{
+      container.style.display='none';
+    }
+    toast('Vision PROCESS OK ('+d.summary.total+' objects)','success');
+  }catch(e){el.textContent='Error: '+e;toast('Vision PROCESS FAILED','error');}
+}
+async function fetchVisionObjects(){
+  try{var d=await api('GET','/api/vision/objects');var stats=d.stats||{};
+    document.getElementById('vision-stats').textContent='Total:'+stats.total+' | Temp:'+stats.temporary+' | Persist:'+stats.persistent+' | Named:'+stats.named;
+    var objs=d.objects||[];var html='';
+    if(objs.length){for(var i=0;i<objs.length;i++){var o=objs[i];html+='<div class="vis-obj-item"><span class="vo-id">'+escapeHtml(o.object_id)+'</span><span class="vo-name">'+(o.name||'')+'</span><span class="vo-status '+(o.status==='persistent'?'matched':'new')+'">'+o.status+'</span><span style="font-size:7px;color:var(--text-dim)">x'+o.appear_count+'</span></div>';}}
+    else{html='<div style="color:#aaa;font-size:10px">NO OBJECTS</div>';}
+    document.getElementById('vision-objects').innerHTML=html;}catch(e){}
+}
+async function visionConfirm(){
+  var id=document.getElementById('vision-confirm-id').value.trim();
+  var name=document.getElementById('vision-confirm-name').value.trim();
+  if(!id||!name){toast('请填写 Object ID 和名称','error');return;}
+  try{var d=await api('POST','/api/vision/confirm',{object_id:id,name:name});
+    var el=document.getElementById('vision-result');el.textContent=JSON.stringify(d,null,2);
+    fetchVisionObjects();toast('CONFIRMED: '+id+' = '+name,'success');await fetchAndRender();
+  }catch(e){toast('CONFIRM FAILED','error');}
+}
+
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+async function fetchConfig(){
+  try{configData=await api('GET','/api/config');var html='';var keys=Object.keys(configData).sort();
+    for(var i=0;i<keys.length;i++){var k=keys[i],v=configData[k];html+='<div class="cfg-row"><span class="cfg-key">'+escapeHtml(k)+'</span><input class="cfg-val" value="'+escapeHtml(String(v))+'" data-key="'+escapeHtml(k)+'" onchange="updateConfigVal(this)"></div>';}
+    document.getElementById('config-panel').innerHTML=html;
+    // sync hide-temp toggle
+    var tgl=document.getElementById('hide-temp-toggle');if(tgl)tgl.checked=configData.hide_temp_nodes!==false;
+  }catch(e){}
+}
+async function updateConfigVal(el){var k=el.getAttribute('data-key'),v=el.value;var body={};body[k]=isNaN(v)?v:parseFloat(v);await api('PUT','/api/config',body);configData[k]=isNaN(v)?v:parseFloat(v);toast(k+' UPDATED','success');}
+
+// ═══════════════════════════════════════════════════════
+// LLM CONFIG
+// ═══════════════════════════════════════════════════════
+async function openLLMSettings(){
+  try{var r=await fetch(API+'/api/llm/status');var d=await r.json();llmProvider=d.provider||'mimo';ensureOllamaOption(!!d.ollama_enabled);document.getElementById('llm-provider').value=llmProvider;document.getElementById('llm-model').value=d.model||'';document.getElementById('llm-api-key').style.display=(llmProvider==='ollama')?'none':'';updateLLMStatus();}catch(e){updateLLMStatus();}
+  document.getElementById('llm-modal-overlay').classList.add('show');
+}
+function closeLLMSettings(){document.getElementById('llm-modal-overlay').classList.remove('show');}
+async function applyLLMSettings(){
+  var provider=document.getElementById('llm-provider').value,model=document.getElementById('llm-model').value.trim(),apiKey=document.getElementById('llm-key').value.trim();
+  var body={provider:provider,model:model||undefined};if(apiKey)body.api_key=apiKey;
+  try{var r=await fetch(API+'/api/llm/switch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});var d=await r.json();
+    if(d.success){llmProvider=provider;updateLLMStatus();toast('SWITCHED TO '+d.model,'success');}else{toast('FAILED: '+(d.error||'unknown'),'error');}}
+  catch(e){toast('NETWORK ERROR','error');}closeLLMSettings();
+}
+function updateLLMStatus(){var el=document.getElementById('llm-status');var dotCls=['deepseek','mimo','ollama'].includes(llmProvider)?llmProvider:'mimo';var labels={ollama:'OLLAMA (LOCAL)',deepseek:'DEEPSEEK API',mimo:'MIMO API (XIAOMI)'};var label=labels[llmProvider]||llmProvider.toUpperCase();el.innerHTML='<span class="dot '+dotCls+'"></span> '+label;}
+
+// ═══════════════════════════════════════════════════════
+// KNOWLEDGE PACKS
+// ═══════════════════════════════════════════════════════
+async function fetchPacks(){
+  try{var data=await api('GET','/api/packs');var packs=data.packs||[];var html='';
+    for(var i=0;i<packs.length;i++){var p=packs[i];html+='<div class="pack-row"><span class="pack-name '+(p.enabled?'on':'off')+'">'+(p.enabled?'●':'○')+' '+escapeHtml(p.name)+'</span><span style="font-size:8px;color:#aaa">N:'+p.node_count+' E:'+p.edge_count+'</span><span>'+((p.enabled?'<button class="btn-sm" onclick="disablePack(\''+escapeHtml(p.name)+'\')">DISABLE</button>':'<button class="btn-sm" onclick="enablePack(\''+escapeHtml(p.name)+'\')">ENABLE</button>'))+' <button class="btn-sm danger" onclick="deletePack(\''+escapeHtml(p.name)+'\')">DEL</button></span></div>';}
+    document.getElementById('packs-list').innerHTML=html||'<div style="color:#aaa">NO PACKS</div>';}catch(e){}
+}
+async function enablePack(name){await api('POST','/api/packs/enable',{name:name});await fetchAndRender();await fetchPacks();toast(name+' ENABLED','success');}
+async function disablePack(name){await api('POST','/api/packs/disable',{name:name});await fetchAndRender();await fetchPacks();toast(name+' DISABLED','success');}
+async function deletePack(name){if(!confirm('DELETE PACK "'+name+'"?'))return;await api('POST','/api/packs/delete',{name:name});await fetchAndRender();await fetchPacks();toast(name+' DELETED','success');}
+async function reloadPacks(){await api('POST','/api/packs/reload');await fetchAndRender();await fetchPacks();toast('PACKS RELOADED','success');}
+async function createPack(){var name=document.getElementById('new-pack-name').value.trim();if(!name){toast('Enter name','error');return;}await api('POST','/api/packs/create',{name:name,type:'semantic',description:''});document.getElementById('new-pack-name').value='';await fetchPacks();toast('PACK '+name+' CREATED','success');}
+
+// ═══════════════════════════════════════════════════════
+// LEARNING MODULE
+// ═══════════════════════════════════════════════════════
+async function learningExplore(){
+  var word=document.getElementById('learn-word').value.trim();if(!word){toast('Enter concept','error');return;}
+  var context=document.getElementById('learn-context').value.trim();
+  var url='/api/learning/explore?word='+encodeURIComponent(word);
+  if(context){url+='&context='+encodeURIComponent(context);}
+  try{var data=await api('GET',url);reviewDraftNodes=data.nodes||[];reviewDraftEdges=data.edges||[];
+    var html='<div style="font-family:var(--sans);font-size:10px;font-weight:600;text-transform:uppercase;color:var(--teal-dim);margin-bottom:4px">EXPLORE: '+escapeHtml(word.toUpperCase())+' ('+(data.exists_in_graph?'EXISTING':'NEW')+')</div>';
+    html+='<div style="font-size:9px;color:#888">NODES: '+reviewDraftNodes.length+' / EDGES: '+reviewDraftEdges.length+'</div>';
+    html+='<div style="display:flex;gap:4px;margin-top:4px"><button class="btn-sm" onclick="switchReviewMode(\'graph\')">GRAPH</button><button class="btn-sm" onclick="switchReviewMode(\'list\')">LIST</button></div>';
+    html+='<div id="review-network-container"><div id="review-network"></div></div><div id="review-list-container" style="display:none"><div id="review-list"></div></div>';
+    document.getElementById('learn-result').innerHTML=html;document.getElementById('learn-actions').style.display='block';renderReviewSandboxNetwork();}catch(e){}
+}
+function switchReviewMode(mode){reviewMode=mode;var nc=document.getElementById('review-network-container'),lc=document.getElementById('review-list-container');if(nc&&lc){nc.style.display=mode==='list'?'none':'block';lc.style.display=mode==='list'?'block':'none';}refreshReviewContent();}
+function refreshReviewContent(){var lc=document.getElementById('review-list-container');if(lc&&lc.style.display!=='none')renderReviewList({nodes:reviewDraftNodes,edges:reviewDraftEdges});else renderReviewSandboxNetwork();}
+function renderReviewSandboxNetwork(){
+  var container=document.getElementById('review-network');if(!container)return;if(!window.vis){toast('vis.js not loaded','error');return;}
+  var visNodes=reviewDraftNodes.map(function(n){var isExisting=n.status==='existing'||n.exists===true;return{id:n.id,label:n.id,color:{background:isExisting?'#00d2d3':'#ff6b00',border:isExisting?'#009a9b':'#cc5500'},font:{color:'#1a1a1a',size:11}};});
+  var visEdges=reviewDraftEdges.map(function(e){return{from:e.src,to:e.dst,label:e.relation||e.type||'REL',color:{color:'#999',highlight:'#ff6b00'},font:{color:'#888',size:9}};});
+  new vis.Network(container,{nodes:new vis.DataSet(visNodes),edges:new vis.DataSet(visEdges)},{physics:{solver:'forceAtlas2Based'},nodes:{shape:'dot',size:16,font:{size:11,face:'Share Tech Mono'}},edges:{arrows:'to',smooth:{type:'continuous'}}});
+}
+function renderReviewList(draft){var el=document.getElementById('review-list');if(!el)return;var html='<div style="font-family:var(--sans);font-size:9px;font-weight:600;text-transform:uppercase;color:var(--teal-dim);margin-bottom:6px">NODES</div>';draft.nodes.forEach(function(node,index){var isExisting=node.status==='existing'||node.exists===true;html+='<div style="border:1px solid #ddd;padding:6px;margin-bottom:4px"><div style="display:flex;justify-content:space-between"><span style="font-family:var(--mono);font-size:10px">'+escapeHtml(node.id)+'</span><span class="pill '+(isExisting?'pill-teal':'pill-orange')+'">'+(isExisting?'EXISTING':'MISSING')+'</span></div><div style="margin-top:4px"><button class="btn-sm" onclick="editReviewNode('+index+')">EDIT</button> <button class="btn-sm" onclick="deleteReviewNode('+index+')">DEL</button></div></div>';});html+='<div style="font-family:var(--sans);font-size:9px;font-weight:600;text-transform:uppercase;color:var(--orange);margin:10px 0 6px">EDGES</div>';draft.edges.forEach(function(edge,index){html+='<div style="border:1px solid #ddd;padding:6px;margin-bottom:4px"><div style="font-size:10px">'+escapeHtml(edge.src)+' →['+escapeHtml(edge.relation||edge.type||'REL')+']→ '+escapeHtml(edge.dst)+'</div><div style="margin-top:4px"><button class="btn-sm" onclick="editReviewEdge('+index+')">EDIT</button> <button class="btn-sm" onclick="deleteReviewEdge('+index+')">DEL</button></div></div>';});el.innerHTML=html;}
+function editReviewNode(index){var node=reviewDraftNodes[index];if(!node)return;var nid=prompt('NODE ID',node.id);if(nid)node.id=nid.trim();var w=prompt('WEIGHT (0-1)',node.weight);if(w)node.weight=parseFloat(w);refreshReviewContent();}
+function editReviewEdge(index){var edge=reviewDraftEdges[index];if(!edge)return;var rel=prompt('RELATION',edge.relation||edge.type||'');if(rel){edge.relation=rel.trim();}var w=prompt('WEIGHT',edge.weight);if(w)edge.weight=parseFloat(w);refreshReviewContent();}
+function deleteReviewNode(index){if(!confirm('DELETE NODE?'))return;var nid=reviewDraftNodes[index].id;reviewDraftEdges=reviewDraftEdges.filter(function(e){return e.src!==nid&&e.dst!==nid});reviewDraftNodes.splice(index,1);refreshReviewContent();}
+function deleteReviewEdge(index){if(!confirm('DELETE EDGE?'))return;reviewDraftEdges.splice(index,1);refreshReviewContent();}
+async function learningImport(){if(!reviewDraftNodes.length){toast('No data','error');return;}await api('POST','/api/learning/import',{nodes:reviewDraftNodes,edges:reviewDraftEdges});toast('IMPORTED','success');document.getElementById('learn-actions').style.display='none';reviewDraftNodes=[];reviewDraftEdges=[];await fetchAndRender();}
+
+// ═══════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════
+function switchTab(name){
+  var tabs=document.querySelectorAll('#right-panel .tab-btn');for(var i=0;i<tabs.length;i++)tabs[i].classList.remove('active');
+  var contents=document.querySelectorAll('#right-panel .tab-content');for(var i=0;i<contents.length;i++)contents[i].classList.remove('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  var btn=document.querySelector('#right-panel .tab-btn[onclick*="'+name+'"]');if(btn)btn.classList.add('active');
+  if(name==='topk')fetchTopKPanel();if(name==='actions'){fetchActionQueue();fetchManualActions();}if(name==='ear')fetchEarStatus();if(name==='eye')fetchEyeStatus();if(name==='reg')fetchRegulation();if(name==='auto'){fetchAutonomy();fetchChannels();}if(name==='internal')fetchInternal();if(name==='vision'){fetchVisionStatus();fetchVisionObjects();}if(name==='config')fetchConfig();if(name==='packs')fetchPacks();if(name==='chatlog')fetchChatLog();
+}
+
+// ═══════════════════════════════════════════════════════
+// CHANNELS（对话通道：世界里的文字聊天 / 外部桥接）
+// 通道只负责收发；回复走的还是同一条认知管线。这里展示真实收发统计。
+// ═══════════════════════════════════════════════════════
+
+function fetchChannels(){
+  api('GET','/api/channels/state').then(function(d){
+    var el=document.getElementById('ch-list');if(!el)return;
+    var st=d.stats||{};
+    var html='';
+    (d.channels||[]).forEach(function(c){
+      var badge=c.available?'<span class="pill teal">在线</span>':'<span class="pill gray">不可用</span>';
+      var prof=c.profile||{};
+      html+='<div class="action-item" style="align-items:flex-start">'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="ai-name">'+escapeHtml(c.id)+' '+badge
+        +' <span style="color:var(--text-dim)">'+escapeHtml(c.kind||'')+'</span></div>'
+        +'<div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:2px">'
+        +'回复上限 '+prof.max_reply_chars+' · 清洗Markdown '+(prof.strip_markdown?'是':'否')
+        +' · 回应与否=<span style="color:var(--teal-dim)">认知决定</span>'
+        +(c.adapter&&c.adapter.user_names?(' · 用户 '+escapeHtml((c.adapter.user_names||[]).join('/'))):'')
+        +'</div></div>'
+        +'<label class="toggle-switch" style="width:28px;height:14px;flex-shrink:0">'
+        +'<input type="checkbox" '+(c.enabled?'checked':'')+' onchange="toggleChannel(\''+escapeHtml(c.id)+'\',this.checked)">'
+        +'<span class="toggle-slider" style="border-radius:14px"></span></label>'
+        +'</div>';
+    });
+    if(!html)html='<div style="color:var(--text-dim)">还没有注册任何通道</div>';
+    html+='<div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:6px;border-top:1px solid #eee;padding-top:6px">'
+      +'收到 '+st.polled+' · 接受 '+st.accepted+' · 回复 '+st.answered
+      +' · 队列 '+d.queue
+      +' · 过滤自己 '+st.ignored_self+' · 他人入认知 '+(st.routed_other||0)
+      +' · 认知沉默 '+(st.silence||0)
+      +' · 送达失败 '+st.send_failed+' · 过期丢弃 '+st.dropped_old+'</div>';
+    el.innerHTML=html;
+
+    var ev=document.getElementById('ch-events');
+    if(ev){
+      var h2='';
+      (d.recent||[]).slice().reverse().forEach(function(e){
+        var color=(e.kind==='replied')?'var(--teal-dim)':(e.kind.indexOf('failed')>=0||e.kind==='dropped')?'var(--red)':'var(--text-dim)';
+        h2+='<div style="color:'+color+'">'+escapeHtml(e.ts||'')+' ['+escapeHtml(e.kind)+'] '
+          +escapeHtml(e.sender||'')+': '+escapeHtml(e.detail||'')+'</div>';
+      });
+      (d.other_messages||[]).slice().reverse().forEach(function(m){
+        h2+='<div style="color:var(--text-dim)">['+escapeHtml(m.sender||'')+' 在游戏里说] '
+          +escapeHtml(m.text||'')+'</div>';
+      });
+      ev.innerHTML=h2||'<div style="color:var(--text-dim)">暂无通道事件</div>';
+    }
+  }).catch(function(e){});
+}
+
+function toggleChannel(id,on){
+  api('POST','/api/channels/'+encodeURIComponent(id),{enabled:on})
+    .then(function(){toast('通道已'+(on?'启用':'停用'));fetchChannels();})
+    .catch(function(e){fetchChannels();});
+}
+
+function channelSend(){
+  var box=document.getElementById('ch-send-text');
+  var text=(box?box.value:'').trim();
+  if(!text){toast('先写一句','error');return;}
+  api('POST','/api/channels/minecraft_chat/send',{text:text})
+    .then(function(d){if(box)box.value='';toast(d.detail||'已发送');fetchChannels();})
+    .catch(function(e){toast('发送失败（看事件里有真实原因）','error');fetchChannels();});
+}
+
+// ═══════════════════════════════════════════════════════
+// INTERNAL STATE（需求 / 神经调制 / 性格）
+// 激素与性格可人工调节（用户要求），每次改动都经后端唯一写入口并留痕；
+// 需求是经历驱动的，界面只读展示（避免把"数值好看"当成机制）。
+// ═══════════════════════════════════════════════════════
+
+var _internalSnapshot = null;
+
+function fetchInternal(){
+  api('GET','/api/internal/state').then(function(d){
+    var cyc=document.getElementById('int-cycle');
+    if(cyc)cyc.textContent='cycle='+d.cycle_seq+(d.current_cycle?(' · 进行中 '+d.current_cycle):'');
+    renderInternalModulators(d.modulators); renderInternalNeeds(d.needs);
+    renderInternalTraits(d.traits);
+  }).catch(function(e){});
+}
+
+function _bar(v,w){
+  var w0=w||70, pct=Math.max(0,Math.min(1,v))*w0;
+  return '<span style="display:inline-block;width:'+w0+'px;height:7px;background:#e4e4e4;vertical-align:middle">'
+    +'<span style="display:inline-block;width:'+pct.toFixed(0)+'px;height:7px;background:var(--teal-dim)"></span></span>';
+}
+
+function renderInternalModulators(ms){
+  var el=document.getElementById('int-modulators');if(!el)return;
+  ms=ms||{};var html='';
+  Object.keys(ms).forEach(function(name){
+    var m=ms[name];
+    // R2：滑杆写的是**浓度**（set_value 落到 tonic），而显示用的 level 是过完受体曲线的
+    // 响应视图。两者在饱和/过载区会分开（浓度再高，响应反而回落），所以两根都画出来，
+    // 免得把"响应回落"误读成"滑杆失灵"。
+    var conc=(m.conc===undefined?m.level:m.conc);
+    var curved=Math.abs(conc-m.level)>0.02;
+    html+='<div style="margin-bottom:6px">'
+      +'<div>'+escapeHtml(name)+' 响应 <b>'+m.level.toFixed(3)+'</b>'
+      +' <span style="color:var(--text-dim)">浓度 '+conc.toFixed(3)
+      +(curved?' · 曲线压缩中':'')+'</span>'
+      +'<span style="color:var(--text-dim)"> · 基线 '+m.baseline.toFixed(2)+' · 范围 '+m.min+'~'+m.max+'</span></div>'
+      +'<div style="color:var(--text-dim);font-size:8px">'+escapeHtml(m.desc||'')+'</div>'
+      // R2 P12 交接④：一根轨道两个读数——青色段=浓度真值，橙色刻度线=受体响应。
+      // 过载区响应回落时刻度线退到段尾左侧，"滑杆没坏，是曲线在压缩"一眼可辨。
+      +(function(){var track='<div style="position:relative;height:8px;background:rgba(255,255,255,.05);border-radius:2px;margin:2px 0"'
+        +' title="青段=浓度（真值）｜橙线=响应（过完受体曲线）">';
+        track+='<div style="position:absolute;left:0;top:0;height:100%;width:'+(Math.max(0,Math.min(1,conc))*100).toFixed(1)+'%;background:var(--teal-dim);opacity:.45;border-radius:2px"></div>';
+        track+='<div style="position:absolute;left:'+(Math.max(0,Math.min(1,m.level))*100).toFixed(1)+'%;top:-2px;width:2px;height:12px;background:var(--orange-dim)"></div>';
+        track+='<div style="position:absolute;left:'+(Math.max(0,Math.min(1,m.baseline))*100).toFixed(1)+'%;top:0;width:1px;height:8px;background:var(--text-dim)"></div>';
+        return track+'</div>';})()
+      +'<input type="range" min="0" max="1" step="0.01" value="'+conc+'" title="滑杆调节的是浓度（tonic）"'
+      +' style="width:100%;margin:2px 0" '
+      +'oninput="setModulator(\''+escapeHtml(name)+'\',this.value)">'
+      +(m.last_sources&&m.last_sources.length?('<div style="color:var(--text-dim);font-size:8px">最近来源: '+escapeHtml(m.last_sources.join(', '))+'</div>'):'')
+      +'</div>';
+  });
+  el.innerHTML=html||'<div style="color:var(--text-dim)">—</div>';
+}
+
+function renderInternalNeeds(ns){
+  var el=document.getElementById('int-needs');if(!el)return;
+  ns=ns||{};var html='';
+  Object.keys(ns).forEach(function(name){
+    var n=ns[name];
+    var rng=(n.ideal_range||[0,1]).map(function(x){return Number(x).toFixed(2);}).join('~');
+    html+='<div style="margin-bottom:5px"><div>'+escapeHtml(name)
+      +' 水平 <b>'+n.level.toFixed(3)+'</b> 紧迫 <b>'+n.urgency.toFixed(3)+'</b> '
+      +_bar(n.level)+'</div>'
+      +'<div style="color:var(--text-dim);font-size:8px">理想区间 '+rng
+      +(n.drivers&&Object.keys(n.drivers).length?(' · 驱动: '+escapeHtml(JSON.stringify(n.drivers)).slice(0,90)):' · 驱动: 尚未接入（Phase 2）')
+      +'</div></div>';
+  });
+  el.innerHTML=html||'<div style="color:var(--text-dim)">—</div>';
+}
+
+function renderInternalTraits(ts){
+  var el=document.getElementById('int-traits');if(!el)return;
+  ts=ts||{};var html='';
+  Object.keys(ts).forEach(function(name){
+    var t=ts[name];
+    var drift=Math.abs(t.value-t.baseline)>0.005;
+    html+='<div style="margin-bottom:5px">'
+      +'<div>'+escapeHtml(name)+' <b>'+t.value.toFixed(3)+'</b> '
+      +'<span style="color:var(--text-dim)">出厂 '+t.baseline.toFixed(2)
+      +(drift?' <span style="color:var(--orange-dim)">已漂移</span>':'')+'</span></div>'
+      +'<div style="color:var(--text-dim);font-size:8px">'+escapeHtml(t.desc||'')+'</div>'
+      +'<input type="range" min="0" max="1" step="0.01" value="'+t.value+'" style="width:100%;margin:2px 0" '
+      +'oninput="setTrait(\''+escapeHtml(name)+'\',this.value)">'
+      +'</div>';
+  });
+  el.innerHTML=html||'<div style="color:var(--text-dim)">—</div>';
+}
+
+function setModulator(name,value){
+  api('POST','/api/internal/modulator/'+encodeURIComponent(name),
+      {level:Number(value),reason:'前端滑块调节'})
+    .then(function(d){fetchInternal();})
+    .catch(function(e){fetchInternal();});
+}
+
+function setTrait(name,value){
+  var body={traits:{}, reason:'前端设定'}; body.traits[name]=Number(value);
+  api('POST','/api/internal/traits',body)
+    .then(function(){fetchInternal();})
+    .catch(function(e){fetchInternal();});
+}
+
+function resetInternal(target){
+  api('POST','/api/internal/reset',{target:target})
+    .then(function(){toast('已恢复出厂（'+target+'）');fetchInternal();})
+    .catch(function(e){});
+}
+
+function internalSnapshot(restore){
+  if(restore){
+    if(!_internalSnapshot){toast('还没有快照','error');return;}
+    api('POST','/api/internal/snapshot',{snapshot:_internalSnapshot})
+      .then(function(){toast('已回滚到快照');fetchInternal();}).catch(function(e){});
+    return;
+  }
+  api('GET','/api/internal/snapshot').then(function(d){
+    _internalSnapshot=d.snapshot; toast('快照已保存（本次会话内可用）');
+  }).catch(function(e){});
+}
+
+function explainInternal(){
+  var el=document.getElementById('int-explain');if(!el)return;
+  api('GET','/api/internal/explain').then(function(d){
+    var html='<div style="color:var(--text-2)">['+escapeHtml(d.cycle_id||'—')+'] '+escapeHtml(d.summary||'')+'</div>';
+    (d.state_changes||[]).forEach(function(c){
+      html+='<div>· '+escapeHtml(c.kind)+' '+escapeHtml(c.name)+' '
+        +c.from+'→'+c.to+' <span style="color:var(--text-dim)">('+escapeHtml(c.reason||'')+')</span></div>';
+    });
+    (d.rewards||[]).forEach(function(r){
+      html+='<div style="color:var(--teal-dim)">· 奖励 '+r.reward+' ← '+escapeHtml(r.explanation||'')+'</div>';
+    });
+    el.innerHTML=html;
+  }).catch(function(e){});
+}
+
+// ═══════════════════════════════════════════════════════
+// AUTONOMY（自主行动：状态 / 意图 / 目标 / 控制）
+// 只展示后端真实状态：意图、得分、依据、结果都来自 /api/autonomy/state，
+// 界面上不编造"她正在思考"之类的内容。
+// ═══════════════════════════════════════════════════════
+
+function fetchAutonomy(){
+  api('GET','/api/autonomy/state').then(function(d){
+    renderAutonomyStatus(d); renderAutonomyCurrent(d); renderAutonomyCandidates(d);
+    renderAutonomyGoals(d); renderAutonomyLog(d.log);
+  }).catch(function(e){});
+}
+
+function renderAutonomyStatus(d){
+  var badge=document.getElementById('auto-mode-badge');if(!badge)return;
+  var mode=String(d.mode||'off').toUpperCase();
+  badge.textContent=d.paused?'PAUSED':mode;
+  badge.className='pill '+(d.mode==='on'?(d.paused?'gray':'teal'):'gray');
+  var phase=document.getElementById('auto-phase');
+  if(phase){
+    var emb=d.embodiment||'—';
+    var stats=d.stats||{};
+    phase.textContent='['+d.state+'] '+escapeHtml(d.state_reason||'')+
+      ' · 具身:'+escapeHtml(emb)+
+      ' · 成功'+stats.success+'/失败'+stats.failed+'/取消'+stats.cancelled;
+  }
+}
+
+function renderAutonomyCurrent(d){
+  var el=document.getElementById('auto-current');if(!el)return;
+  var html='';
+  if(d.current_intent){
+    var c=d.current_intent;
+    html+='<div>意图: <b>'+escapeHtml(c.type)+'</b> → '+escapeHtml(c.target||'—')
+      +' <span style="color:var(--text-dim)">得分 '+c.score+'</span></div>'
+      +'<div style="color:var(--text-dim)">依据: '+escapeHtml(c.explain||'')+'</div>'
+      +'<div style="color:var(--text-dim)">理由: '+escapeHtml(c.basis?c.basis.join(', '):'—')+'</div>';
+  } else {
+    html+='<div style="color:var(--text-dim)">当前没有正在执行的自主意图</div>';
+  }
+  if(d.in_flight){
+    html+='<div style="color:var(--orange-dim)">进行中: '+escapeHtml(d.in_flight.type)
+      +' → '+escapeHtml(d.in_flight.target||'—')+'</div>';
+  }
+  var lr=d.last_result;
+  if(lr){
+    var color=lr.success?'var(--teal-dim)':'var(--red)';
+    html+='<div style="color:'+color+';margin-top:4px">最近: '
+      +escapeHtml(lr.action||'')+' '+(lr.success?'成功':'失败')
+      +(lr.reason?('（'+escapeHtml(lr.reason)+'）'):'')
+      +(lr.duration_s!=null?(' '+lr.duration_s+'s'):'')
+      +(lr.ts?(' · '+escapeHtml(lr.ts)):'')+'</div>';
+  }
+  el.innerHTML=html;
+}
+
+function renderAutonomyCandidates(d){
+  var el=document.getElementById('auto-candidates');if(!el)return;
+  var cands=d.candidates||[];
+  if(!cands.length){el.innerHTML='<div style="color:var(--text-dim)">还没有候选（需要一次 tick 才会生成）</div>';}
+  else{
+    var html='';
+    cands.forEach(function(c,i){
+      var color=i===0?'var(--orange-dim)':'var(--text-dim)';
+      html+='<div style="color:'+color+'">'+escapeHtml(c.type)+'@'+escapeHtml(c.target||'—')
+        +' <b>'+c.score+'</b></div>'
+        +'<div style="color:var(--text-dim);padding-left:8px">'+escapeHtml(c.explain||'')+'</div>';
+    });
+    el.innerHTML=html;
+  }
+  var dr=document.getElementById('auto-drives');
+  if(dr){
+    var ds=d.drives||{};
+    var keys=Object.keys(ds);
+    dr.textContent=keys.length?('动机: '+keys.map(function(k){return k+'='+ds[k];}).join(' · ')):'动机: —';
+  }
+}
+
+function renderAutonomyGoals(d){
+  var el=document.getElementById('auto-goals');if(!el)return;
+  var goals=d.goals||[];
+  if(!goals.length){el.innerHTML='<div style="color:var(--text-dim)">没有待办目标（自主行动也可以从环境自发产生）</div>';return;}
+  var html='';
+  goals.forEach(function(g,i){
+    html+='<div class="action-item"><span class="ai-name">'+escapeHtml(g.type)+' → '+escapeHtml(g.target||'—')
+      +(g.text?(' 「'+escapeHtml(g.text)+'」'):'')+'</span>'
+      +'<button class="exec-btn" onclick="deleteAutonomyGoal('+i+')">DEL</button></div>';
+  });
+  el.innerHTML=html;
+}
+
+function renderAutonomyLog(log){
+  var el=document.getElementById('auto-log');if(!el)return;
+  var html='';
+  (log||[]).slice().reverse().forEach(function(l){
+    var color=l.kind==='result'?'var(--teal-dim)':(l.kind==='blocked'?'var(--red)':'var(--text-dim)');
+    html+='<div style="color:'+color+'">'+escapeHtml(l.ts||'')+' ['+escapeHtml(l.kind)+'] '
+      +escapeHtml(l.text||'')+'</div>';
+  });
+  el.innerHTML=html||'<div style="color:var(--text-dim)">暂无记录</div>';
+}
+
+function setAutonomy(mode){
+  api('POST','/api/autonomy/mode',{mode:mode}).then(function(d){
+    toast('自主行动 '+d.mode); fetchAutonomy();
+  }).catch(function(e){});
+}
+function autonomyPause(){api('POST','/api/autonomy/pause',{}).then(function(){toast('自主循环已暂停');fetchAutonomy();}).catch(function(e){});}
+function autonomyResume(){api('POST','/api/autonomy/resume',{}).then(function(){toast('自主循环已恢复');fetchAutonomy();}).catch(function(e){});}
+function autonomyStep(){
+  api('POST','/api/autonomy/step',{}).then(function(d){
+    var r=d.result||{};
+    toast(r.acted?('自主行动: '+r.intent+' → '+(r.target||'')):('未行动: '+r.reason));
+    fetchAutonomy();
+  }).catch(function(e){});
+}
+function addAutonomyGoal(){
+  var box=document.getElementById('auto-goal-text');
+  var text=(box?box.value:'').trim();
+  if(!text){toast('先写一句目标','error');return;}
+  api('POST','/api/autonomy/goals',{text:text}).then(function(d){
+    if(box)box.value='';
+    toast(d.parsed?('已解析为 '+d.parsed.type):'目标已加入'); fetchAutonomy();
+  }).catch(function(e){});
+}
+function deleteAutonomyGoal(i){
+  api('DELETE','/api/autonomy/goals/'+i).then(function(){toast('目标已删除');fetchAutonomy();}).catch(function(e){});
+}
+
+// ═══════════════════════════════════════════════════════
+// COGNITIVE REGULATION（锁 / 状态检测器 / 触发器）
+// 复用既有约定：api() 请求封装、innerHTML 拼接 + escapeHtml、
+// .module/.form-row/.action-item/.toggle-switch 样式、toast 提示。
+// ═══════════════════════════════════════════════════════
+
+function fetchRegulation(){
+  api('GET','/api/regulation/state').then(function(d){
+    renderLocks(d.locks);renderMonitors(d.monitors);renderTriggers(d.triggers);
+    renderRegLog(d.triggers&&d.triggers.recent_log,d.recent_cognitive_events);
+  }).catch(function(e){});
+}
+
+function renderLocks(ls){
+  var el=document.getElementById('reg-locks');if(!el)return;
+  ls=ls||{};var items=ls.locks||[];
+  var cnt=document.getElementById('reg-lock-count');if(cnt)cnt.textContent=items.length?('（'+items.length+'）'):'';
+  if(!items.length){el.innerHTML='<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">暂无锁。锁只控制参与/输出，不改动对象本身。</div>';return;}
+  var html='';
+  for(var i=0;i<items.length;i++){
+    var lk=items[i];
+    var kind=lk.lock_type==='blocking'?'<span class="pill orange">BLOCK</span>':'<span class="pill gray">NON-BLOCK</span>';
+    var missing=lk.target_missing?'<span class="pill gray" title="目标已不在图里">悬空</span>':'';
+    html+='<div class="action-item" style="align-items:flex-start">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div class="ai-name" style="white-space:normal;word-break:break-all">'+escapeHtml(lk.target_type+': '+lk.target_id)+'</div>'
+      +'<div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:2px">'+kind
+      +'<span class="pill gray" style="margin-left:4px">'+escapeHtml(lk.scope)+'</span>'+missing
+      +'<span style="margin-left:4px">'+escapeHtml(lk.reason||'（无原因）')+'</span></div>'
+      +'</div>'
+      +'<label class="toggle-switch" style="width:28px;height:14px;flex-shrink:0" title="启用/禁用">'
+      +'<input type="checkbox" '+(lk.enabled?'checked':'')+' onchange="toggleLock(\''+escapeHtml(lk.id)+'\',this.checked)">'
+      +'<span class="toggle-slider" style="border-radius:14px"></span></label>'
+      +'<button class="exec-btn" style="flex-shrink:0" onclick="deleteLock(\''+escapeHtml(lk.id)+'\')">DEL</button>'
+      +'</div>';
+  }
+  el.innerHTML=html;
+}
+
+function renderMonitors(ms){
+  var el=document.getElementById('reg-monitors');if(!el)return;
+  ms=ms||{};var items=ms.monitors||[];
+  var cnt=document.getElementById('reg-mon-count');if(cnt)cnt.textContent=items.length?('（'+items.length+'）'):'';
+  if(!items.length){el.innerHTML='<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">暂无检测器。状态变化会生成事件并交给触发器评估。</div>';return;}
+  var html='';
+  for(var i=0;i<items.length;i++){
+    var m=items[i];
+    var cur=(m.current_value===null||m.current_value===undefined)?'—':String(m.current_value);
+    var err=m.last_error?'<div style="font-family:var(--mono);font-size:8px;color:var(--red);margin-top:2px">错误: '+escapeHtml(m.last_error)+'</div>':'';
+    html+='<div class="action-item" style="align-items:flex-start">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div class="ai-name" style="white-space:normal">'+escapeHtml(m.id)+' <span style="color:var(--text-dim)">'+escapeHtml(m.name||'')+'</span></div>'
+      +'<div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:2px">'
+      +'target='+escapeHtml(m.target_id||'—')+' · '+escapeHtml(m.state_type)+' · mode='+escapeHtml(m.mode)
+      +' · 观测'+String(m.observation_count||0)+'次</div>'
+      +'<div style="font-family:var(--mono);font-size:9px;margin-top:2px">当前: <b>'+escapeHtml(cur)+'</b>'+escapeHtml(m.unit||'')
+      +' <span style="color:var(--text-dim)">更新 '+(m.updated_at?escapeHtml(m.updated_at):'—')+'</span></div>'+err
+      +'</div>'
+      +'<input type="text" id="obs-'+escapeHtml(m.id)+'" placeholder="提交状态" style="width:70px;flex-shrink:0;background:#fff;border:1px solid #ccc;padding:2px 4px;font-family:var(--mono);font-size:9px;outline:none">'
+      +'<button class="exec-btn" style="flex-shrink:0" onclick="observeMonitor(\''+escapeHtml(m.id)+'\')">SET</button>'
+      +'<label class="toggle-switch" style="width:28px;height:14px;flex-shrink:0" title="启用/禁用">'
+      +'<input type="checkbox" '+(m.enabled?'checked':'')+' onchange="toggleMonitor(\''+escapeHtml(m.id)+'\',this.checked)">'
+      +'<span class="toggle-slider" style="border-radius:14px"></span></label>'
+      +'<button class="exec-btn" style="flex-shrink:0" onclick="deleteMonitor(\''+escapeHtml(m.id)+'\')">DEL</button>'
+      +'</div>';
+  }
+  el.innerHTML=html;
+}
+
+function renderTriggers(ts){
+  var el=document.getElementById('reg-triggers');if(!el)return;
+  ts=ts||{};var items=ts.triggers||[];
+  var cnt=document.getElementById('reg-trig-count');if(cnt)cnt.textContent=items.length?('（'+items.length+'）'):'';
+  if(!items.length){el.innerHTML='<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">暂无触发器。条件必须结构化（如 current &gt;= 10）。</div>';return;}
+  var html='';
+  for(var i=0;i<items.length;i++){
+    var t=items[i];
+    var cond=t.condition||{};
+    var llm=t.llm_mode===0?'':'<span class="pill gray" style="margin-left:4px">LLM '+t.llm_mode+'</span>';
+    var err=t.last_error?'<div style="font-family:var(--mono);font-size:8px;color:var(--red);margin-top:2px">错误: '+escapeHtml(t.last_error)+'</div>':'';
+    html+='<div class="action-item" style="align-items:flex-start">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div class="ai-name" style="white-space:normal">'+escapeHtml(t.id)+' <span style="color:var(--text-dim)">'+escapeHtml(t.name||'')+'</span></div>'
+      +'<div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);margin-top:2px">'
+      +'monitor='+escapeHtml(t.monitor_id)+' · 条件='+escapeHtml(cond.op||'?')
+      +' · '+(t.fire_mode==='edge'?'跃变触发':'持续触发')+' · 冷却'+t.cooldown_s+'s · 已触发'+t.fire_count+'次'
+      +'<span class="pill gray" style="margin-left:4px">P'+t.priority+'</span>'+llm+'</div>'+err
+      +'</div>'
+      +'<label class="toggle-switch" style="width:28px;height:14px;flex-shrink:0" title="启用/禁用">'
+      +'<input type="checkbox" '+(t.enabled?'checked':'')+' onchange="toggleTrigger(\''+escapeHtml(t.id)+'\',this.checked)">'
+      +'<span class="toggle-slider" style="border-radius:14px"></span></label>'
+      +'<button class="exec-btn" style="flex-shrink:0" onclick="deleteTrigger(\''+escapeHtml(t.id)+'\')">DEL</button>'
+      +'</div>';
+  }
+  el.innerHTML=html;
+}
+
+function renderRegLog(log,events){
+  var el=document.getElementById('reg-log');if(!el)return;
+  var html='';
+  (log||[]).slice().reverse().forEach(function(r){
+    var color=r.kind==='fired'?'var(--teal-dim)':'var(--text-dim)';
+    html+='<div style="color:'+color+'">'+escapeHtml(r.ts||'')+' '+(r.kind==='fired'?'[触发] ':'[拒绝] ')+escapeHtml(r.trigger_id||'')
+      +(r.kind==='fired'?(' ← '+escapeHtml(r.explain||'')):(' 原因: '+escapeHtml(r.reason||'')))
+      +'</div>';
+  });
+  (events||[]).slice().reverse().forEach(function(e){
+    html+='<div style="color:var(--orange-dim)">'+escapeHtml(e.ts||'')+' 认知事件 '
+      +escapeHtml(e.monitor_name||e.monitor_id||'')+' '
+      +escapeHtml(String(e.previous))+'→'+escapeHtml(String(e.current))
+      +'（LLM '+e.llm_mode+'）</div>';
+  });
+  if(!html)html='<div style="color:var(--text-dim)">暂无记录。</div>';
+  el.innerHTML=html;
+}
+
+function createLock(){
+  var target=(document.getElementById('lk-target').value||'').trim();
+  if(!target){toast('请填目标对象','error');return;}
+  api('POST','/api/regulation/locks',{
+    target_type:document.getElementById('lk-type').value,
+    target_id:target,
+    lock_type:document.getElementById('lk-kind').value,
+    scope:document.getElementById('lk-scope').value,
+    reason:(document.getElementById('lk-reason').value||'').trim()
+  }).then(function(){document.getElementById('lk-target').value='';toast('锁已建立');fetchRegulation();fetchAndRender();}).catch(function(e){});
+}
+
+function toggleLock(id,on){
+  api('PUT','/api/regulation/locks/'+encodeURIComponent(id),{enabled:on})
+    .then(function(){toast(on?'锁已启用':'锁已禁用');fetchRegulation();fetchAndRender();}).catch(function(e){fetchRegulation();});
+}
+
+function deleteLock(id){
+  api('DELETE','/api/regulation/locks/'+encodeURIComponent(id))
+    .then(function(){toast('锁已删除（对象未改动）');fetchRegulation();fetchAndRender();}).catch(function(e){});
+}
+
+function createMonitor(){
+  var body={name:(document.getElementById('mon-name').value||'').trim(),
+            target_id:(document.getElementById('mon-target').value||'').trim(),
+            state_type:document.getElementById('mon-state').value};
+  var mid=(document.getElementById('mon-id').value||'').trim();if(mid)body.id=mid;
+  api('POST','/api/regulation/monitors',body).then(function(){
+    document.getElementById('mon-id').value='';document.getElementById('mon-name').value='';
+    toast('检测器已建立');fetchRegulation();}).catch(function(e){});
+}
+
+function toggleMonitor(id,on){
+  api('PUT','/api/regulation/monitors/'+encodeURIComponent(id),{enabled:on})
+    .then(function(){toast(on?'检测器已启用':'检测器已禁用');fetchRegulation();}).catch(function(e){fetchRegulation();});
+}
+
+function deleteMonitor(id){
+  api('DELETE','/api/regulation/monitors/'+encodeURIComponent(id))
+    .then(function(){toast('检测器已删除');fetchRegulation();}).catch(function(e){});
+}
+
+function observeMonitor(id){
+  var box=document.getElementById('obs-'+id);if(!box)return;
+  var raw=(box.value||'').trim();if(raw===''){toast('请填状态值','error');return;}
+  var val=raw;
+  if(raw==='true'||raw==='false')val=(raw==='true');
+  else if(!isNaN(Number(raw)))val=Number(raw);
+  api('POST','/api/regulation/monitors/'+encodeURIComponent(id)+'/observe',{value:val,source:'manual'})
+    .then(function(d){box.value='';toast(d.changed?('状态变化 → '+d.current):'状态未变（不产生事件）');fetchRegulation();}).catch(function(e){});
+}
+
+// 前端条件简写 → 结构化条件（与后端同构；运行时判断永远在后端确定性执行）
+function parseCondShorthand(text){
+  text=(text||'').trim();
+  if(!text)return {op:'changed'};
+  var m=text.match(/^(current|previous|delta|observation_count|confidence)\s*(>=|<=|==|!=|>|<)\s*(.+)$/);
+  if(m){
+    var opMap={'>=':'gte','<=':'lte','==':'eq','!=':'ne','>':'gt','<':'lt'};
+    var v=m[3].trim();var num=Number(v);
+    return {op:opMap[m[2]],field:m[1],value:(v!==''&&!isNaN(num))?num:v};
+  }
+  if(text==='changed')return {op:'changed'};
+  return null;
+}
+
+function createTrigger(){
+  var cond=parseCondShorthand(document.getElementById('tr-cond').value);
+  if(cond===null){toast('条件格式不合法：用 current >= 10 / changed 这类写法','error');return;}
+  var nodes=(document.getElementById('tr-nodes').value||'').split(',').map(function(x){return x.trim();}).filter(function(x){return x;});
+  api('POST','/api/regulation/triggers',{
+    name:(document.getElementById('tr-name').value||'').trim(),
+    monitor_id:(document.getElementById('tr-monitor').value||'*').trim()||'*',
+    condition:cond,
+    action:{type:'activate_nodes',nodes:nodes},
+    cooldown_s:Number(document.getElementById('tr-cooldown').value||0),
+    llm_mode:Number(document.getElementById('tr-llm').value||0)
+  }).then(function(){document.getElementById('tr-name').value='';toast('触发器已建立');fetchRegulation();}).catch(function(e){});
+}
+
+function toggleTrigger(id,on){
+  api('PUT','/api/regulation/triggers/'+encodeURIComponent(id),{enabled:on})
+    .then(function(){toast(on?'触发器已启用':'触发器已禁用');fetchRegulation();}).catch(function(e){fetchRegulation();});
+}
+
+function deleteTrigger(id){
+  api('DELETE','/api/regulation/triggers/'+encodeURIComponent(id))
+    .then(function(){toast('触发器已删除');fetchRegulation();}).catch(function(e){});
+}
+
+// 节点详情 → 一键加锁（锁类型由按钮决定，范围默认注意力扩散）
+function lockSelectedNode(kind){
+  if(!selectedNodeId){toast('先选中一个节点','error');return;}
+  api('POST','/api/regulation/locks',{
+    target_type:'node',target_id:selectedNodeId,
+    lock_type:kind,scope:'diffusion',
+    reason:kind==='blocking'?'界面手动阻塞':'界面手动隐藏（仍参与扩散）'
+  }).then(function(){toast('已对 '+selectedNodeId+' 加锁');updateSelectedLockBadge();fetchRegulation();})
+   .catch(function(e){});
+}
+
+function updateSelectedLockBadge(){
+  var el=document.getElementById('si-lock');if(!el)return;
+  if(!selectedNodeId){el.textContent='—';return;}
+  api('GET','/api/regulation/locks/check?target_type=node&target_id='+encodeURIComponent(selectedNodeId))
+    .then(function(d){
+      if(d.blocked)el.innerHTML='<span class="pill orange">BLOCKED</span>';
+      else if(d.hidden)el.innerHTML='<span class="pill gray">HIDDEN</span>';
+      else el.textContent='—';
+    }).catch(function(e){el.textContent='—';});
+}
+
+// ═══════════════════════════════════════════════════════
+// CHAT LOG
+// ═══════════════════════════════════════════════════════
+async function fetchChatLog(){
+  try{
+    var r=await fetch(API+'/api/chat/log?n=100');
+    var d=await r.json();
+    if(!d.success)return;
+    renderChatLog(d.entries);
+    updateChatLogStats(d.stats);
+  }catch(e){console.error('ChatLog fetch:',e);}
+}
+
+async function searchChatLog(){
+  var q=document.getElementById('chatlog-search').value.trim();
+  if(!q){fetchChatLog();return;}
+  try{
+    var r=await fetch(API+'/api/chat/log/search?q='+encodeURIComponent(q)+'&n=100');
+    var d=await r.json();
+    if(!d.success)return;
+    renderChatLog(d.entries);
+  }catch(e){console.error('ChatLog search:',e);}
+}
+
+function renderChatLog(entries){
+  var el=document.getElementById('chatlog-entries');
+  if(!entries||!entries.length){el.innerHTML='<div style="color:var(--text-dim);font-family:var(--mono);font-size:10px;padding:12px;text-align:center">NO ENTRIES</div>';return;}
+
+  var html='';
+  for(var i=entries.length-1;i>=0;i--){
+    var e=entries[i];
+    var t=e.time?e.time.replace('T',' ').substring(0,19):'';
+    html+='<div class="chat-entry">';
+    html+='<div class="chat-time">'+escapeHtml(t)+'</div>';
+    html+='<div class="chat-user">'+escapeHtml(e.user_input||'')+'</div>';
+    if(e.system_response){
+      html+='<div class="chat-resp">'+escapeHtml(e.system_response)+'</div>';
+    }
+    if(e.curiosity&&e.curiosity_question){
+      html+='<div class="chat-curiosity"><span class="tag">CURIOSITY</span>'+escapeHtml(e.curiosity_question)+'</div>';
+    }
+    if(e.curiosity_resolved&&e.curiosity_answer){
+      html+='<div class="chat-resolved"><span class="tag">ANSWERED</span>'+escapeHtml(e.curiosity_answer)+'</div>';
+    }
+    html+='</div>';
+  }
+  el.innerHTML=html;
+  el.scrollTop=0;
+}
+
+function updateChatLogStats(stats){
+  var el=document.getElementById('chatlog-stats');
+  if(!stats)return;
+  el.textContent='TOTAL: '+stats.total_entries+'  |  CURIOSITY: '+stats.curiosity_triggered+'  |  RESOLVED: '+stats.curiosity_resolved;
+}
+
+// ═══════════════════════════════════════════════════════
+// CONSOLE
+// ═══════════════════════════════════════════════════════
+function toggleConsole(){var bar=document.getElementById('console-bar');bar.classList.toggle('expanded');}
+function addConsole(input,result){
+  var el=document.getElementById('console-log');var now=new Date();var time=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0')+':'+now.getSeconds().toString().padStart(2,'0');
+  el.innerHTML+='<div class="console-entry"><span class="console-time">'+time+'</span><span class="console-in">> '+escapeHtml(input)+'</span><span class="console-out">'+escapeHtml(result)+'</span></div>';el.scrollTop=el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════════
+// PROACTIVE — 持续认知主动消息轮询（最后一公里通道）
+// ═══════════════════════════════════════════════════════
+async function pollProactive(){
+  try{var r=await fetch(API+'/api/proactive/poll');var d=await r.json();
+    if(d.messages&&d.messages.length){
+      for(var i=0;i<d.messages.length;i++){
+        var m=d.messages[i];
+        addConsole('[FAS主动] '+(m.goal||''),m.text);
+        var el=document.getElementById('llm-answer');var t=document.getElementById('llm-answer-text');
+        el.style.display='block';t.innerHTML='✦ '+escapeHtml(m.text);
+        toast('FAS 主动开口了','success');
+      }
+      fetchAndRender();
+    }
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════
+
+async function fetchEyeStatus(){try{var r=await fetch(API+'/api/eye/status');var d=await r.json();document.getElementById('eye-status-text').textContent=d.available?'READY':'不可用';}catch(e){document.getElementById('eye-status-text').textContent='不可用';}}
+async function eyeCapture(){
+  var el=document.getElementById('eye-result');el.textContent='截屏识别中…';
+  try{var r=await fetch(API+'/api/eye/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});var d=await r.json();
+    if(d.error){el.textContent='失败: '+d.error;return;}
+    var lines='识别 '+d.count+' 条（入图节点: '+(d.graph_node||'无')+'）\n';
+    (d.items||[]).slice(0,15).forEach(function(it){
+      lines+='('+it.center[0]+','+it.center[1]+') '+it.text+'\n';});
+    el.textContent=lines;
+  }catch(e){el.textContent='网络错误';}
+}
+// INIT
+// ═══════════════════════════════════════════════════════
+async function init(){
+  initCanvasGraph();await fetchAndRender();fetchTopKPanel();fetchConfig();fetchPacks();
+  setInterval(pollProactive,12000);pollProactive();
+  // 自主面板可见时跟着同一轮询刷新（不可见不打扰后端）
+  setInterval(function(){var t=document.getElementById('tab-auto');
+    if(t&&t.classList.contains('active')){fetchAutonomy();fetchChannels();}
+    var it=document.getElementById('tab-internal');
+    if(it&&it.classList.contains('active'))fetchInternal();},12000);
+  document.getElementById('status-blip').className='online';document.getElementById('status-text').textContent='ONLINE';
+  try{var r=await fetch(API+'/api/diffuse/status');var d=await r.json();if(d.running){autoRunning=true;updateAutoUI();autoInterval=setInterval(async function(){try{await fetchAndRender();fetchTopKPanel();fetchActionQueue();}catch(e){}},3000);}}catch(e){}
+  try{var r2=await fetch(API+'/api/llm/status');var d2=await r2.json();llmProvider=d2.provider||'mimo';ensureOllamaOption(!!d2.ollama_enabled);updateLLMStatus();}catch(e){}
+  document.getElementById('nlp-input').addEventListener('keydown',function(e){if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();submitNLP();}});
+}
+window.addEventListener('DOMContentLoaded',init);
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
+</body>
+</html>

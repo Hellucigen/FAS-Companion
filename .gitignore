@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.idea/
+.vscode/
+.claude/
+
+# LLM 密钥与运行配置绝不入库（example 除外）
+data/*
+!data/llm_config.example.json
+data/api_token.json
+data/llm_config.json
+data/llm_secret.json
+
+logs/
+*.log
+graph_snapshots/
+data/runtime_graph.json
+
+# Minecraft 机器人（node_modules 不入库）
+minecraft/bot/node_modules/
